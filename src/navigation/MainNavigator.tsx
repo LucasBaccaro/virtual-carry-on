@@ -48,6 +48,16 @@ function TabNavigator() {
                 }}
             />
             <Tab.Screen
+                name="Closet"
+                component={WardrobeManagementScreen}
+                options={{
+                    tabBarLabel: 'Closet',
+                    tabBarIcon: ({ color, size, focused }) => (
+                        <MaterialIcons name={focused ? "checkroom" : "checkroom"} size={size} color={color} />
+                    ),
+                }}
+            />
+            <Tab.Screen
                 name="Wardrobe"
                 component={WardrobeScreen}
                 options={{
@@ -58,12 +68,12 @@ function TabNavigator() {
                 }}
             />
             <Tab.Screen
-                name="Closet"
+                name="Categories"
                 component={ManageCategoriesScreen}
                 options={{
-                    tabBarLabel: 'Closet',
+                    tabBarLabel: 'Categories',
                     tabBarIcon: ({ color, size, focused }) => (
-                        <MaterialIcons name={focused ? "checkroom" : "checkroom"} size={size} color={color} />
+                        <MaterialIcons name={focused ? "category" : "category"} size={size} color={color} />
                     ),
                 }}
             />
@@ -85,7 +95,6 @@ export default function MainNavigator() {
     return (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="MainTabs" component={TabNavigator} />
-            <Stack.Screen name="WardrobeManagement" component={WardrobeManagementScreen} />
         </Stack.Navigator>
     );
 }

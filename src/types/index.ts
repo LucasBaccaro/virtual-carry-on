@@ -1,14 +1,15 @@
-export type GarmentType = 'upper_body' | 'lower_body' | 'footwear';
+export type GarmentType = 'upper' | 'lower' | 'footwear';
 
 export type GarmentFit = 'tight' | 'slim' | 'regular' | 'loose' | 'oversize';
 
 export interface Garment {
     id: string;
-    name: string;
-    image: any; // require() path
-    type: GarmentType;
+    user_id: string;
+    category: GarmentType;
+    type: string;
     description: string;
-    fit: GarmentFit;
+    image_url: string;
+    created_at: string;
 }
 
 export interface Category {
@@ -16,26 +17,23 @@ export interface Category {
     name: string;
 }
 
-export interface Outfit {
+export interface SavedOutfit {
     id: string;
-    image: string; // Base64 string
-    date: string;
-    model: 'gemini-3-pro' | 'gemini-2.5-flash';
+    imageUrl: string;
+    timestamp: string;
+    modelUsed: 'gemini-3-pro' | 'gemini-2.5-flash';
     categoryId?: string;
-    garments: {
-        upper?: { type: string; description: string };
-        lower?: { type: string; description: string };
-        footwear?: { type: string; description: string };
-    };
+    garmentIds: string[];
 }
 
 export interface User {
     id: string;
-    name: string;
-    image: any; // require() path
+    email: string;
+    full_body_photo_url?: string;
 }
 
 export interface TryOnResult {
-    imageBase64: string;
-    timestamp: number;
+    success: boolean;
+    imageBase64?: string;
+    error?: string;
 }

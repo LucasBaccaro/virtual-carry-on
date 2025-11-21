@@ -42,12 +42,12 @@ export default function ManageCategoriesScreen() {
 
     const handleDeletePress = (id: string) => {
         showAlert(
-            'Delete Category',
-            'Are you sure you want to delete this category?',
+            'Eliminar Categoría',
+            '¿Estás seguro de que quieres eliminar esta categoría?',
             [
-                { text: 'Cancel', style: 'cancel', onPress: () => setAlertVisible(false) },
+                { text: 'Cancelar', style: 'cancel', onPress: () => setAlertVisible(false) },
                 {
-                    text: 'Delete',
+                    text: 'Eliminar',
                     style: 'destructive',
                     onPress: async () => {
                         await removeCategory(id);
@@ -75,19 +75,13 @@ export default function ManageCategoriesScreen() {
         <SafeAreaView style={styles.container} edges={['top']}>
             {/* Header */}
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <MaterialIcons name="arrow-back" size={24} color="#1A1A1A" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Manage Categories</Text>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.doneButton}>
-                    <Text style={styles.doneButtonText}>Done</Text>
-                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Categorías</Text>
             </View>
 
             {/* List */}
             <ScrollView style={styles.content}>
-                {categories.map((category) => (
-                    <View key={category.id} style={styles.listItem}>
+                {categories.map((category, index) => (
+                    <View key={`manage-category-${category.id}-${index}`} style={styles.listItem}>
                         <View style={styles.itemLeft}>
                             <View style={styles.dragHandle}>
                                 <MaterialIcons name="drag-indicator" size={24} color="#A1A1AA" />
@@ -115,7 +109,7 @@ export default function ManageCategoriesScreen() {
             {/* Footer */}
             <View style={styles.footer}>
                 <TouchableOpacity style={styles.addButton} onPress={handleAddPress}>
-                    <Text style={styles.addButtonText}>Add New Category</Text>
+                    <Text style={styles.addButtonText}>Nueva Categoría</Text>
                 </TouchableOpacity>
             </View>
 
@@ -132,11 +126,11 @@ export default function ManageCategoriesScreen() {
                 >
                     <View style={styles.modalContent}>
                         <Text style={styles.modalTitle}>
-                            {editingCategory ? 'Edit Category' : 'New Category'}
+                            {editingCategory ? 'Editar Categoría' : 'Nueva Categoría'}
                         </Text>
                         <TextInput
                             style={styles.input}
-                            placeholder="Category Name"
+                            placeholder="Nombre de la categoría"
                             value={categoryName}
                             onChangeText={setCategoryName}
                             autoFocus
@@ -146,13 +140,13 @@ export default function ManageCategoriesScreen() {
                                 style={[styles.modalButton, styles.cancelButton]}
                                 onPress={() => setModalVisible(false)}
                             >
-                                <Text style={styles.cancelButtonText}>Cancel</Text>
+                                <Text style={styles.cancelButtonText}>Cancelar</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={[styles.modalButton, styles.saveButton]}
                                 onPress={handleSave}
                             >
-                                <Text style={styles.saveButtonText}>Save</Text>
+                                <Text style={styles.saveButtonText}>Guardar</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -177,34 +171,14 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
     },
     header: {
-        flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
+        justifyContent: 'center',
         padding: 16,
         borderBottomWidth: 1,
         borderBottomColor: '#EFEFEF',
     },
-    backButton: {
-        width: 40,
-        height: 40,
-        justifyContent: 'center',
-        alignItems: 'flex-start',
-    },
     headerTitle: {
         fontSize: 18,
-        fontWeight: '700',
-        color: '#1A1A1A',
-        textAlign: 'center',
-        flex: 1,
-    },
-    doneButton: {
-        width: 40,
-        height: 40,
-        justifyContent: 'center',
-        alignItems: 'flex-end',
-    },
-    doneButtonText: {
-        fontSize: 16,
         fontWeight: '700',
         color: '#1A1A1A',
     },

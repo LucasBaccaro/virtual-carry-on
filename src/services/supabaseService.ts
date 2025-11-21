@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { decode } from 'base64-arraybuffer';
 
 export interface Profile {
@@ -46,7 +46,7 @@ export const getProfile = async (userId: string): Promise<{ data: Profile | null
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
     return { data, error };
 };
@@ -74,7 +74,7 @@ export const updateProfilePhoto = async (
 
         // Read file as base64
         const base64 = await FileSystem.readAsStringAsync(photoUri, {
-            encoding: FileSystem.EncodingType.Base64,
+            encoding: 'base64',
         });
 
         const { error: uploadError } = await supabase.storage
@@ -138,14 +138,23 @@ export const createGarment = async (
     imageUri: string
 ): Promise<{ data: Garment | null; error: any }> => {
     try {
+        console.log('🔵 [createGarment] Iniciando subida de prenda...');
+        console.log('📝 [createGarment] Parámetros:', { userId, category, type, description, imageUri: imageUri.substring(0, 50) + '...' });
+
         // Upload image
         const fileExt = imageUri.split('.').pop() || 'jpg';
         const fileName = `${Date.now()}.${fileExt}`;
         const filePath = `${userId}/${category}/${fileName}`;
 
+        console.log('📁 [createGarment] Ruta de archivo:', filePath);
+        console.log('🖼️ [createGarment] Leyendo imagen como base64...');
+
         const base64 = await FileSystem.readAsStringAsync(imageUri, {
-            encoding: FileSystem.EncodingType.Base64,
+            encoding: 'base64',
         });
+
+        console.log('✅ [createGarment] Imagen leída, tamaño base64:', base64.length, 'caracteres');
+        console.log('☁️ [createGarment] Subiendo a Supabase Storage bucket: garment-images...');
 
         const { error: uploadError } = await supabase.storage
             .from('garment-images')
@@ -153,12 +162,23 @@ export const createGarment = async (
                 contentType: `image/${fileExt}`,
             });
 
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+            console.error('❌ [createGarment] ERROR AL SUBIR IMAGEN A STORAGE:');
+            console.error('Error completo:', JSON.stringify(uploadError, null, 2));
+            console.error('Mensaje:', uploadError.message);
+            console.error('Status:', uploadError.statusCode);
+            throw uploadError;
+        }
+
+        console.log('✅ [createGarment] Imagen subida exitosamente a Storage');
 
         // Get public URL
         const { data: { publicUrl } } = supabase.storage
             .from('garment-images')
             .getPublicUrl(filePath);
+
+        console.log('🔗 [createGarment] URL pública generada:', publicUrl);
+        console.log('💾 [createGarment] Insertando registro en base de datos...');
 
         // Create garment record
         const { data, error } = await supabase
@@ -173,8 +193,23 @@ export const createGarment = async (
             .select()
             .single();
 
+        if (error) {
+            console.error('❌ [createGarment] ERROR AL INSERTAR EN BASE DE DATOS:');
+            console.error('Error completo:', JSON.stringify(error, null, 2));
+            console.error('Mensaje:', error.message);
+            console.error('Code:', error.code);
+            return { data: null, error };
+        }
+
+        console.log('✅ [createGarment] Prenda creada exitosamente:', data);
         return { data, error };
     } catch (error) {
+        console.error('❌ [createGarment] ERROR GENERAL:');
+        console.error('Error completo:', error);
+        if (error instanceof Error) {
+            console.error('Error.message:', error.message);
+            console.error('Error.stack:', error.stack);
+        }
         return { data: null, error };
     }
 };

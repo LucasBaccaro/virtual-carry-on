@@ -5,6 +5,7 @@ import { getProfile, updateProfilePhoto } from '../services/supabaseService';
 interface UserPhotoContextType {
     userPhotoUri: string | null;
     setUserPhoto: (uri: string) => Promise<void>;
+    reloadUserPhoto: () => Promise<void>;
     isLoading: boolean;
     isUploading: boolean;
 }
@@ -41,12 +42,18 @@ export function UserPhotoProvider({ children }: { children: ReactNode }) {
 
             if (data?.full_body_photo_url) {
                 setUserPhotoUri(data.full_body_photo_url);
+            } else {
+                setUserPhotoUri(null);
             }
         } catch (error) {
             console.error('Error loading user photo:', error);
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const reloadUserPhoto = async () => {
+        await loadUserPhoto();
     };
 
     const setUserPhoto = async (uri: string) => {
@@ -74,6 +81,7 @@ export function UserPhotoProvider({ children }: { children: ReactNode }) {
             value={{
                 userPhotoUri,
                 setUserPhoto,
+                reloadUserPhoto,
                 isLoading,
                 isUploading,
             }}

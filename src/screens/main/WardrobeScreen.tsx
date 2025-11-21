@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, StatusBar, Modal } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, typography, spacing, borderRadius } from '../../constants/theme';
@@ -16,7 +16,7 @@ export default function WardrobeScreen() {
     const navigation = useNavigation();
     const { user } = useAuth();
     const { saveOutfit, categories } = useOutfits();
-    const { userPhotoUri } = useUserPhoto();
+    const { userPhotoUri, reloadUserPhoto } = useUserPhoto();
 
     // Garments from Supabase
     const [upperGarments, setUpperGarments] = useState<Garment[]>([]);
@@ -34,6 +34,7 @@ export default function WardrobeScreen() {
     const [generatedImageBase64, setGeneratedImageBase64] = useState<string | null>(null);
     const [selectedModel, setSelectedModel] = useState<'gemini-3-pro' | 'gemini-2.5-flash'>('gemini-3-pro');
     const [categoryModalVisible, setCategoryModalVisible] = useState(false);
+    const [isComparing, setIsComparing] = useState(false);
 
     // Alert State
     const [alertVisible, setAlertVisible] = useState(false);
@@ -44,13 +45,18 @@ export default function WardrobeScreen() {
         setAlertVisible(true);
     };
 
-    // Load garments from Supabase on mount
-    useEffect(() => {
-        loadGarments();
-    }, [user]);
+    // Load garments and user photo from Supabase on mount and when screen is focused
+    useFocusEffect(
+        React.useCallback(() => {
+            loadGarments();
+            reloadUserPhoto();
+        }, [user])
+    );
 
     const loadGarments = async () => {
         if (!user) return;
+
+        console.log('🔄 [WardrobeScreen] Recargando prendas...');
 
         try {
             setIsLoadingGarments(true);
@@ -60,11 +66,31 @@ export default function WardrobeScreen() {
                 getGarments(user.id, 'footwear'),
             ]);
 
-            if (upperResult.data) setUpperGarments(upperResult.data);
-            if (lowerResult.data) setLowerGarments(lowerResult.data);
-            if (footwearResult.data) setFootwearGarments(footwearResult.data);
+            if (upperResult.data) {
+                console.log(`✅ [WardrobeScreen] Parte superior: ${upperResult.data.length} prendas`);
+                // Verificar IDs únicos
+                const uniqueIds = new Set(upperResult.data.map(g => g.id));
+                if (uniqueIds.size !== upperResult.data.length) {
+                    console.warn('⚠️ [WardrobeScreen] IDs duplicados detectados en parte superior');
+                }
+                setUpperGarments(upperResult.data || []);
+            } else {
+                setUpperGarments([]);
+            }
+            if (lowerResult.data) {
+                console.log(`✅ [WardrobeScreen] Parte inferior: ${lowerResult.data.length} prendas`);
+                setLowerGarments(lowerResult.data || []);
+            } else {
+                setLowerGarments([]);
+            }
+            if (footwearResult.data) {
+                console.log(`✅ [WardrobeScreen] Calzado: ${footwearResult.data.length} prendas`);
+                setFootwearGarments(footwearResult.data || []);
+            } else {
+                setFootwearGarments([]);
+            }
         } catch (error) {
-            console.error('Error loading garments:', error);
+            console.error('❌ [WardrobeScreen] Error loading garments:', error);
             showAlert('Error', 'No se pudieron cargar las prendas');
         } finally {
             setIsLoadingGarments(false);
@@ -125,6 +151,7 @@ export default function WardrobeScreen() {
         setSelectedUpper(null);
         setSelectedLower(null);
         setSelectedFootwear(null);
+        setIsComparing(false);
     };
 
     const handleSavePress = () => {
@@ -169,26 +196,26 @@ export default function WardrobeScreen() {
                     <Text style={styles.emptyText}>No hay prendas</Text>
                     <TouchableOpacity
                         style={styles.addButton}
-                        onPress={() => navigation.navigate('WardrobeManagement')}
+                        onPress={() => navigation.navigate('Closet')}
                     >
                         <Text style={styles.addButtonText}>+ Agregar</Text>
                     </TouchableOpacity>
                 </View>
             ) : (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.garmentList}>
-                    {items.map((item) => (
+                    {items.map((item, index) => (
                         <TouchableOpacity
-                            key={item.id}
+                            key={`${item.id}-${index}`}
                             style={[
                                 styles.garmentCard,
                                 selectedId === item.id && styles.selectedGarmentCard
                             ]}
                             onPress={() => onSelect(item.id)}
                         >
-                            <Image source={{ uri: item.image_url }} style={styles.garmentImage} />
+                            <Image source={{ uri: item.image_url }} style={styles.garmentImage} resizeMode="cover" />
                             {selectedId === item.id && (
-                                <View style={styles.selectedBadge}>
-                                    <MaterialIcons name="check" size={16} color="#FFFFFF" />
+                                <View style={styles.checkBadge}>
+                                    <MaterialIcons name="check" size={14} color="#FFFFFF" />
                                 </View>
                             )}
                         </TouchableOpacity>
@@ -196,48 +223,6 @@ export default function WardrobeScreen() {
                 </ScrollView>
             )}
         </View>
-    );
-
-    const renderCategoryModal = () => (
-        <Modal
-            visible={categoryModalVisible}
-            transparent
-            animationType="fade"
-            onRequestClose={() => setCategoryModalVisible(false)}
-        >
-            <TouchableOpacity
-                style={styles.modalOverlay}
-                activeOpacity={1}
-                onPress={() => setCategoryModalVisible(false)}
-            >
-                <View style={styles.modalContent}>
-                    <Text style={styles.modalTitle}>Guardar en categoría</Text>
-                    <ScrollView style={styles.categoryList}>
-                        <TouchableOpacity
-                            style={styles.categoryOption}
-                            onPress={() => confirmSave()}
-                        >
-                            <Text style={styles.categoryText}>Sin categoría</Text>
-                        </TouchableOpacity>
-                        {categories.map(cat => (
-                            <TouchableOpacity
-                                key={cat.id}
-                                style={styles.categoryOption}
-                                onPress={() => confirmSave(cat.id)}
-                            >
-                                <Text style={styles.categoryText}>{cat.name}</Text>
-                            </TouchableOpacity>
-                        ))}
-                    </ScrollView>
-                    <TouchableOpacity
-                        style={styles.modalCancelButton}
-                        onPress={() => setCategoryModalVisible(false)}
-                    >
-                        <Text style={styles.modalCancelText}>Cancelar</Text>
-                    </TouchableOpacity>
-                </View>
-            </TouchableOpacity>
-        </Modal>
     );
 
     if (isLoadingGarments) {
@@ -266,10 +251,35 @@ export default function WardrobeScreen() {
                     </Text>
                     <TouchableOpacity
                         style={styles.emptyStateButton}
-                        onPress={() => navigation.navigate('WardrobeManagement')}
+                        onPress={() => navigation.navigate('Closet')}
                     >
                         <MaterialIcons name="add" size={24} color="#FFFFFF" />
                         <Text style={styles.emptyStateButtonText}>Agregar Prendas</Text>
+                    </TouchableOpacity>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    if (!userPhotoUri) {
+        return (
+            <SafeAreaView style={styles.container} edges={['top']}>
+                <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+                <View style={styles.header}>
+                    <Text style={styles.headerTitle}>Crear Outfit</Text>
+                </View>
+                <View style={styles.emptyStateContainer}>
+                    <MaterialIcons name="person-outline" size={80} color="#CCC" />
+                    <Text style={styles.emptyStateTitle}>Subí tu foto de perfil</Text>
+                    <Text style={styles.emptyStateText}>
+                        Necesitas tu foto de cuerpo entero para probar outfits
+                    </Text>
+                    <TouchableOpacity
+                        style={styles.emptyStateButton}
+                        onPress={() => navigation.navigate('Profile')}
+                    >
+                        <MaterialIcons name="add-a-photo" size={24} color="#FFFFFF" />
+                        <Text style={styles.emptyStateButtonText}>Ir a Perfil</Text>
                     </TouchableOpacity>
                 </View>
             </SafeAreaView>
@@ -282,72 +292,136 @@ export default function WardrobeScreen() {
 
             {/* Header */}
             <View style={styles.header}>
-                <View>
-                    <Text style={styles.title}>Probador Virtual</Text>
-                    <Text style={styles.subtitle}>{totalGarments} prendas</Text>
-                </View>
-                <TouchableOpacity
-                    style={styles.manageButton}
-                    onPress={() => navigation.navigate('WardrobeManagement')}
-                >
-                    <MaterialIcons name="settings" size={24} color="#000" />
-                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Crear Outfit</Text>
             </View>
 
-            <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-                {/* Model Selector */}
-                <ModelSelector selectedModel={selectedModel} onSelectModel={setSelectedModel} />
+            <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+                {/* Model Selection */}
+                <View style={styles.modelSelectionContainer}>
+                    <ModelSelector selectedModel={selectedModel} onSelectModel={setSelectedModel} />
+                </View>
+
+                {/* Main Preview Area */}
+                <View style={styles.previewContainer}>
+                    <TouchableOpacity
+                        style={styles.previewCard}
+                        activeOpacity={1}
+                        onPressIn={() => generatedImageBase64 && setIsComparing(true)}
+                        onPressOut={() => setIsComparing(false)}
+                        disabled={isGenerating || !generatedImageBase64}
+                    >
+                        {isGenerating ? (
+                            <View style={styles.centerContent}>
+                                <ActivityIndicator size="large" color="#000000" />
+                                <Text style={styles.loadingText}>Generando tu look...</Text>
+                            </View>
+                        ) : (
+                            <Image
+                                source={
+                                    generatedImageBase64 && !isComparing
+                                        ? { uri: `data:image/jpeg;base64,${generatedImageBase64}` }
+                                        : { uri: userPhotoUri }
+                                }
+                                style={styles.previewImage}
+                                resizeMode="cover"
+                            />
+                        )}
+
+                        {!isGenerating && generatedImageBase64 && (
+                            <View style={styles.previewOverlay}>
+                                <Text style={styles.previewOverlayText}>
+                                    {isComparing ? 'Foto original' : 'Mantén presionado para comparar'}
+                                </Text>
+                            </View>
+                        )}
+
+                        {/* Save Button Overlay */}
+                        {generatedImageBase64 && !isGenerating && !isComparing && (
+                            <TouchableOpacity
+                                style={styles.saveButton}
+                                onPress={handleSavePress}
+                            >
+                                <MaterialIcons name="favorite" size={24} color="#FFFFFF" />
+                            </TouchableOpacity>
+                        )}
+                    </TouchableOpacity>
+                </View>
 
                 {/* Garment Sections */}
                 {renderGarmentSection('Parte Superior', upperGarments, selectedUpper, setSelectedUpper)}
                 {renderGarmentSection('Parte Inferior', lowerGarments, selectedLower, setSelectedLower)}
                 {renderGarmentSection('Calzado', footwearGarments, selectedFootwear, setSelectedFootwear)}
 
-                {/* Generated Image Preview */}
-                {generatedImageBase64 && (
-                    <View style={styles.previewSection}>
-                        <Text style={styles.sectionTitle}>Vista Previa</Text>
-                        <Image
-                            source={{ uri: `data:image/jpeg;base64,${generatedImageBase64}` }}
-                            style={styles.previewImage}
-                            resizeMode="contain"
-                        />
-                        <View style={styles.previewActions}>
-                            <TouchableOpacity style={styles.saveButton} onPress={handleSavePress}>
-                                <MaterialIcons name="save" size={20} color="#FFFFFF" />
-                                <Text style={styles.saveButtonText}>Guardar</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.resetButton} onPress={handleReset}>
-                                <MaterialIcons name="refresh" size={20} color="#000" />
-                                <Text style={styles.resetButtonText}>Reintentar</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                )}
             </ScrollView>
 
-            {/* Action Button */}
-            {!generatedImageBase64 && (
-                <View style={styles.footer}>
+            {/* Bottom Action Bar */}
+            <View style={styles.bottomActionBar}>
+                <View style={styles.actionButtonsRow}>
                     <TouchableOpacity
-                        style={[styles.tryOnButton, isGenerating && styles.tryOnButtonDisabled]}
+                        style={styles.resetButton}
+                        onPress={handleReset}
+                        disabled={isGenerating}
+                    >
+                        <Text style={styles.resetButtonText}>Resetear</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.tryOnButton}
                         onPress={handleTryOn}
                         disabled={isGenerating}
                     >
-                        {isGenerating ? (
-                            <ActivityIndicator color="#FFFFFF" />
-                        ) : (
-                            <>
-                                <MaterialIcons name="auto-awesome" size={24} color="#FFFFFF" />
-                                <Text style={styles.tryOnButtonText}>Probar Outfit</Text>
-                            </>
-                        )}
+                        <Text style={styles.tryOnButtonText}>
+                            {isGenerating ? 'Procesando...' : 'Probar'}
+                        </Text>
                     </TouchableOpacity>
                 </View>
-            )}
+            </View>
 
-            {/* Category Modal */}
-            {renderCategoryModal()}
+            {/* Category Selection Modal */}
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={categoryModalVisible}
+                onRequestClose={() => setCategoryModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Guardar en Categoría</Text>
+                            <TouchableOpacity onPress={() => setCategoryModalVisible(false)}>
+                                <MaterialIcons name="close" size={24} color="#1A1A1A" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView style={styles.categoryList}>
+                            <TouchableOpacity
+                                style={styles.categoryItem}
+                                onPress={() => confirmSave(undefined)}
+                            >
+                                <View style={styles.categoryIcon}>
+                                    <MaterialIcons name="checkroom" size={20} color="#666" />
+                                </View>
+                                <Text style={styles.categoryText}>Sin categoría</Text>
+                                <MaterialIcons name="chevron-right" size={20} color="#CCC" />
+                            </TouchableOpacity>
+
+                            {categories.map((category, index) => (
+                                <TouchableOpacity
+                                    key={`${category.id}-${index}`}
+                                    style={styles.categoryItem}
+                                    onPress={() => confirmSave(category.id)}
+                                >
+                                    <View style={styles.categoryIcon}>
+                                        <MaterialIcons name="label-outline" size={20} color="#666" />
+                                    </View>
+                                    <Text style={styles.categoryText}>{category.name}</Text>
+                                    <MaterialIcons name="chevron-right" size={20} color="#CCC" />
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
 
             {/* Custom Alert */}
             <CustomAlert
@@ -372,8 +446,9 @@ const styles = StyleSheet.create({
         gap: 16,
     },
     loadingText: {
-        fontSize: 16,
-        color: '#666',
+        marginTop: 12,
+        fontSize: 14,
+        color: '#666666',
     },
     emptyStateContainer: {
         flex: 1,
@@ -409,36 +484,79 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
     },
     header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
+        justifyContent: 'center',
         paddingHorizontal: 16,
         paddingVertical: 12,
         borderBottomWidth: 1,
         borderBottomColor: '#EFEFEF',
+        backgroundColor: '#FFFFFF',
     },
-    title: {
-        fontSize: 24,
+    headerTitle: {
+        fontSize: 18,
         fontWeight: '700',
         color: '#1A1A1A',
-    },
-    subtitle: {
-        fontSize: 14,
-        color: '#666',
-        marginTop: 2,
-    },
-    manageButton: {
-        width: 48,
-        height: 48,
-        alignItems: 'center',
-        justifyContent: 'center',
     },
     scrollView: {
         flex: 1,
     },
-    content: {
+    scrollContent: {
+        paddingBottom: 100, // Space for bottom bar
+    },
+    modelSelectionContainer: {
+        paddingHorizontal: 16,
+        paddingTop: 12,
+        paddingBottom: 0,
+    },
+    previewContainer: {
+        paddingHorizontal: 16,
+        marginBottom: 24,
+    },
+    previewCard: {
+        position: 'relative',
+        width: '100%',
+        aspectRatio: 3 / 4,
+        borderRadius: 12,
+        backgroundColor: '#F0F0F0',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        overflow: 'hidden',
+    },
+    previewImage: {
+        width: '100%',
+        height: '100%',
+    },
+    centerContent: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    previewOverlay: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
         padding: 16,
-        paddingBottom: 100,
+        backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    },
+    previewOverlayText: {
+        color: '#FFFFFF',
+        fontSize: 18,
+        fontWeight: '700',
+        textShadowColor: 'rgba(0, 0, 0, 0.5)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 4,
+    },
+    saveButton: {
+        position: 'absolute',
+        top: 16,
+        right: 16,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     section: {
         marginBottom: 24,
@@ -446,43 +564,16 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 18,
         fontWeight: '700',
-        color: '#1A1A1A',
-        marginBottom: 12,
-    },
-    garmentList: {
-        gap: 12,
-    },
-    garmentCard: {
-        width: 100,
-        height: 120,
-        borderRadius: 8,
-        overflow: 'hidden',
-        backgroundColor: '#F5F5F5',
-        borderWidth: 2,
-        borderColor: 'transparent',
-    },
-    selectedGarmentCard: {
-        borderColor: '#000',
-    },
-    garmentImage: {
-        width: '100%',
-        height: '100%',
-    },
-    selectedBadge: {
-        position: 'absolute',
-        top: 4,
-        right: 4,
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        backgroundColor: '#000',
-        alignItems: 'center',
-        justifyContent: 'center',
+        color: '#000000',
+        letterSpacing: -0.2,
+        paddingHorizontal: 16,
+        marginBottom: 8,
     },
     emptyGarments: {
         alignItems: 'center',
         paddingVertical: 32,
         gap: 8,
+        paddingHorizontal: 16,
     },
     emptyText: {
         fontSize: 14,
@@ -500,71 +591,75 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#FFFFFF',
     },
-    previewSection: {
-        marginTop: 16,
-    },
-    previewImage: {
-        width: '100%',
-        height: 400,
-        borderRadius: 12,
-        backgroundColor: '#F5F5F5',
-    },
-    previewActions: {
-        flexDirection: 'row',
+    garmentList: {
+        paddingHorizontal: 16,
         gap: 12,
-        marginTop: 16,
     },
-    saveButton: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        backgroundColor: '#000',
-        paddingVertical: 16,
+    garmentCard: {
+        width: 128,
+        aspectRatio: 3 / 4,
         borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        overflow: 'hidden',
+        position: 'relative',
+        marginRight: 12,
     },
-    saveButtonText: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#FFFFFF',
+    selectedGarmentCard: {
+        borderWidth: 2,
+        borderColor: '#000000',
     },
-    resetButton: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
+    garmentImage: {
+        width: '100%',
+        height: '100%',
+    },
+    checkBadge: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        backgroundColor: '#000000',
         justifyContent: 'center',
-        gap: 8,
-        backgroundColor: '#F5F5F5',
-        paddingVertical: 16,
-        borderRadius: 8,
+        alignItems: 'center',
     },
-    resetButtonText: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#000',
-    },
-    footer: {
+    bottomActionBar: {
         position: 'absolute',
         bottom: 0,
         left: 0,
         right: 0,
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
         padding: 16,
-        backgroundColor: '#FFFFFF',
         borderTopWidth: 1,
-        borderTopColor: '#EFEFEF',
+        borderTopColor: '#E5E7EB',
+    },
+    actionButtonsRow: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    resetButton: {
+        flex: 1,
+        height: 48,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#000000',
+        backgroundColor: '#FFFFFF',
+    },
+    resetButtonText: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#000000',
     },
     tryOnButton: {
-        flexDirection: 'row',
-        height: 56,
-        backgroundColor: '#000',
-        borderRadius: 8,
-        alignItems: 'center',
+        flex: 1,
+        height: 48,
         justifyContent: 'center',
-        gap: 8,
-    },
-    tryOnButtonDisabled: {
-        opacity: 0.6,
+        alignItems: 'center',
+        borderRadius: 8,
+        backgroundColor: '#000000',
     },
     tryOnButtonText: {
         fontSize: 16,
@@ -573,42 +668,50 @@ const styles = StyleSheet.create({
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: 'rgba(0,0,0,0.5)',
         justifyContent: 'flex-end',
     },
     modalContent: {
         backgroundColor: '#FFFFFF',
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
         padding: 24,
         maxHeight: '80%',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 24,
     },
     modalTitle: {
         fontSize: 20,
         fontWeight: '700',
         color: '#1A1A1A',
-        marginBottom: 16,
     },
     categoryList: {
-        maxHeight: 300,
+        maxHeight: 400,
     },
-    categoryOption: {
+    categoryItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
         paddingVertical: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#EFEFEF',
+        borderBottomColor: '#F3F4F6',
+    },
+    categoryIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#F3F4F6',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
     },
     categoryText: {
+        flex: 1,
         fontSize: 16,
         color: '#1A1A1A',
-    },
-    modalCancelButton: {
-        marginTop: 16,
-        paddingVertical: 16,
-        alignItems: 'center',
-    },
-    modalCancelText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#666',
+        fontWeight: '500',
     },
 });

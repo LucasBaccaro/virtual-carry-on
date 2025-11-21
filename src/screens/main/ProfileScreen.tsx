@@ -60,17 +60,16 @@ export default function ProfileScreen() {
         try {
             const result = await ImagePicker.launchCameraAsync({
                 mediaTypes: ['images'],
-                allowsEditing: true,
-                aspect: [3, 4],
+                allowsEditing: false,
                 quality: 0.8,
             });
 
             if (!result.canceled && result.assets[0]) {
                 await setUserPhoto(result.assets[0].uri);
-                showAlert('Success', 'Your photo has been saved');
+                showAlert('Éxito', 'Tu foto ha sido guardada');
             }
         } catch (error) {
-            showAlert('Error', 'Could not take photo');
+            showAlert('Error', 'No se pudo tomar la foto');
         }
     };
 
@@ -81,17 +80,16 @@ export default function ProfileScreen() {
         try {
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ['images'],
-                allowsEditing: true,
-                aspect: [3, 4],
+                allowsEditing: false,
                 quality: 0.8,
             });
 
             if (!result.canceled && result.assets[0]) {
                 await setUserPhoto(result.assets[0].uri);
-                showAlert('Success', 'Your photo has been saved');
+                showAlert('Éxito', 'Tu foto ha sido guardada');
             }
         } catch (error) {
-            showAlert('Error', 'Could not select photo');
+            showAlert('Error', 'No se pudo seleccionar la foto');
         }
     };
 
@@ -106,8 +104,7 @@ export default function ProfileScreen() {
 
             {/* Header */}
             <View style={styles.header}>
-                <Text style={styles.title}>Tu Foto</Text>
-                <Text style={styles.subtitle}>Foto activa</Text>
+                <Text style={styles.headerTitle}>Perfil</Text>
             </View>
 
             <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
@@ -122,7 +119,7 @@ export default function ProfileScreen() {
                             <Image
                                 source={typeof displayImage === 'string' ? { uri: displayImage } : displayImage}
                                 style={styles.photo}
-                                resizeMode="cover"
+                                resizeMode="contain"
                             />
                         )}
                         {isCustomPhoto && !isUploading && (
@@ -150,23 +147,12 @@ export default function ProfileScreen() {
                     <TouchableOpacity
                         style={styles.actionButton}
                         onPress={handleChoosePhoto}
-                        disabled={uploading}
+                        disabled={isUploading}
                     >
                         <View style={styles.iconContainer}>
                             <MaterialIcons name="photo-library" size={24} color="#000000" />
                         </View>
                         <Text style={styles.actionButtonText}>Elegir de Galería</Text>
-                        <MaterialIcons name="chevron-right" size={24} color="rgba(0,0,0,0.5)" />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.actionButton}
-                        onPress={() => navigation.navigate('WardrobeManagement')}
-                    >
-                        <View style={styles.iconContainer}>
-                            <MaterialIcons name="checkroom" size={24} color="#000000" />
-                        </View>
-                        <Text style={styles.actionButtonText}>Gestionar Guardarropa</Text>
                         <MaterialIcons name="chevron-right" size={24} color="rgba(0,0,0,0.5)" />
                     </TouchableOpacity>
                 </View>
@@ -227,22 +213,18 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
     },
     header: {
-        paddingHorizontal: spacing.lg,
-        paddingTop: spacing.lg,
-        paddingBottom: spacing.sm,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#EFEFEF',
         backgroundColor: '#FFFFFF',
     },
-    title: {
-        fontSize: 28,
+    headerTitle: {
+        fontSize: 18,
         fontWeight: '700',
-        color: '#000000',
-        letterSpacing: -0.5,
-        lineHeight: 34,
-    },
-    subtitle: {
-        fontSize: 16,
-        fontWeight: '400',
-        color: 'rgba(0,0,0,0.6)',
+        color: '#1A1A1A',
     },
     scrollView: {
         flex: 1,

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, StatusBar, Image, TouchableOpacity, Dimensions,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Swiper from 'react-native-deck-swiper';
 import { MaterialIcons } from '@expo/vector-icons';
+import ImageViewing from 'react-native-image-viewing';
 import { colors, typography, spacing, borderRadius } from '../../constants/theme';
 import { useOutfits } from '../../context/OutfitContext';
 import CustomAlert from '../../components/CustomAlert';
@@ -17,6 +18,8 @@ export default function HomeScreen() {
     const [alertVisible, setAlertVisible] = useState(false);
     const [outfitToDelete, setOutfitToDelete] = useState<string | null>(null);
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
+    const [imageModalVisible, setImageModalVisible] = useState(false);
+    const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
     const swiperRef = React.useRef<Swiper<any>>(null);
 
     const filteredOutfits = selectedCategory === 'all'
@@ -61,16 +64,37 @@ export default function HomeScreen() {
         }
     }, [selectedCategory]);
 
+    const handleImagePress = (imageUrl: string) => {
+        setSelectedImageUrl(imageUrl);
+        setImageModalVisible(true);
+    };
+
+    const handleCloseImageViewer = () => {
+        setImageModalVisible(false);
+        // Limpiar el estado después de cerrar para evitar problemas
+        setTimeout(() => {
+            setSelectedImageUrl(null);
+        }, 300);
+    };
+
+    const images = selectedImageUrl ? [{ uri: selectedImageUrl }] : [];
+
     const renderCard = (outfit: typeof savedOutfits[0], index: number) => {
         if (!outfit) return null;
 
         return (
-            <View style={styles.card}>
-                <Image
-                    source={{ uri: outfit.imageUrl }}
-                    style={styles.cardImage}
-                    resizeMode="cover"
-                />
+            <View key={`card-${outfit.id}-${index}`} style={styles.card}>
+                <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={() => handleImagePress(outfit.imageUrl)}
+                    style={styles.imageContainer}
+                >
+                    <Image
+                        source={{ uri: outfit.imageUrl }}
+                        style={styles.cardImage}
+                        resizeMode="cover"
+                    />
+                </TouchableOpacity>
 
                 {/* Counter Badge */}
                 <View style={styles.counterBadge}>
@@ -87,16 +111,10 @@ export default function HomeScreen() {
                     <MaterialIcons name="delete-outline" size={24} color="black" />
                 </TouchableOpacity>
 
-                {/* Footer Overlay */}
-                <View style={styles.cardFooter}>
-                    <View style={styles.footerItem}>
-                        <MaterialIcons name="calendar-today" size={16} color="black" />
-                        <Text style={styles.footerText}>{formatDate(outfit.timestamp)}</Text>
-                    </View>
-                    <View style={styles.footerItem}>
-                        <MaterialIcons name="auto-awesome" size={16} color="black" />
-                        <Text style={styles.footerText}>Powered by Gemini</Text>
-                    </View>
+                {/* Date Badge */}
+                <View style={styles.dateBadge}>
+                    <MaterialIcons name="calendar-today" size={14} color="white" />
+                    <Text style={styles.dateText}>{formatDate(outfit.timestamp)}</Text>
                 </View>
             </View>
         );
@@ -120,10 +138,7 @@ export default function HomeScreen() {
 
             {/* Header */}
             <View style={styles.header}>
-                <Text style={styles.title}>SmartFit</Text>
-                <Text style={styles.subtitle}>
-                    {filteredOutfits.length} Outfits
-                </Text>
+                <Text style={styles.headerTitle}>Mis Outfits</Text>
             </View>
 
             {/* Category Filter */}
@@ -146,9 +161,9 @@ export default function HomeScreen() {
                         ]}>All Outfits</Text>
                     </TouchableOpacity>
 
-                    {categories.map(category => (
+                    {categories.map((category, index) => (
                         <TouchableOpacity
-                            key={category.id}
+                            key={`category-${category.id}-${index}`}
                             style={[
                                 styles.filterChip,
                                 selectedCategory === category.id && styles.activeFilterChip
@@ -170,7 +185,7 @@ export default function HomeScreen() {
             ) : (
                 <View style={styles.swiperContainer}>
                     <Swiper
-                        key={`${selectedCategory}-${filteredOutfits.length}`}
+                        key={`swiper-${selectedCategory}-${filteredOutfits.length}-${filteredOutfits.map(o => o.id).join('-')}`}
                         ref={swiperRef}
                         cards={filteredOutfits}
                         renderCard={renderCard}
@@ -195,6 +210,18 @@ export default function HomeScreen() {
                 </View>
             )}
 
+            {/* Image Zoom Viewer */}
+            {selectedImageUrl && (
+                <ImageViewing
+                    key={`image-viewer-${selectedImageUrl}`}
+                    images={images}
+                    imageIndex={0}
+                    visible={imageModalVisible}
+                    onRequestClose={handleCloseImageViewer}
+                    backgroundColor="rgba(0, 0, 0, 0.95)"
+                />
+            )}
+
             {/* Custom Alert for Delete */}
             <CustomAlert
                 visible={alertVisible}
@@ -216,28 +243,23 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF', // bg-white
     },
     header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: spacing.lg,
-        paddingTop: spacing.lg,
-        paddingBottom: spacing.sm,
+        justifyContent: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#EFEFEF',
         backgroundColor: '#FFFFFF',
     },
-    title: {
-        fontSize: 24,
+    headerTitle: {
+        fontSize: 18,
         fontWeight: '700',
-        color: '#000000',
-        letterSpacing: -0.5,
-    },
-    subtitle: {
-        fontSize: 16,
-        fontWeight: '500',
-        color: '#6B7280', // text-gray-500
+        color: '#1A1A1A',
     },
     filterContainer: {
         height: 50,
-        marginBottom: 8,
+        marginBottom: 4,
+        marginTop: 12,
     },
     filterContent: {
         paddingHorizontal: spacing.lg,
@@ -265,7 +287,7 @@ const styles = StyleSheet.create({
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        marginTop: -20, // Adjust to center vertically better
+        marginTop: -40,
     },
     card: {
         width: CARD_WIDTH,
@@ -298,31 +320,22 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         zIndex: 10,
     },
-    cardFooter: {
+    dateBadge: {
         position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: spacing.md,
-        backgroundColor: 'transparent',
-    },
-    footerItem: {
+        bottom: spacing.md,
+        left: spacing.md,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
-        paddingHorizontal: 12,
+        gap: 6,
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        paddingHorizontal: 10,
         paddingVertical: 6,
         borderRadius: 20,
     },
-    footerText: {
-        fontSize: 14,
-        fontWeight: '500',
-        color: '#000000',
-        marginLeft: 4,
+    dateText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#FFFFFF',
     },
     emptyState: {
         flex: 1,
@@ -357,5 +370,9 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 14,
         fontWeight: '600',
+    },
+    imageContainer: {
+        width: '100%',
+        height: '100%',
     },
 });

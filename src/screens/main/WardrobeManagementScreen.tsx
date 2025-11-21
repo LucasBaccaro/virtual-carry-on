@@ -72,25 +72,42 @@ export default function WardrobeManagementScreen() {
     };
 
     const handleUpload = async () => {
-        if (!user) return;
+        console.log('🟢 [handleUpload] Iniciando proceso de subida...');
+
+        if (!user) {
+            console.error('❌ [handleUpload] No hay usuario autenticado');
+            return;
+        }
+
+        console.log('👤 [handleUpload] Usuario:', user.id);
 
         try {
+            console.log('📸 [handleUpload] Solicitando permiso de galería...');
             const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
             if (!permission.granted) {
+                console.warn('⚠️ [handleUpload] Permiso de galería denegado');
                 showAlert('Permiso Necesario', 'Necesitamos acceso a tus fotos');
                 return;
             }
 
+            console.log('✅ [handleUpload] Permiso de galería concedido');
+            console.log('🖼️ [handleUpload] Abriendo selector de imágenes...');
+
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                allowsEditing: true,
-                aspect: [3, 4],
+                allowsEditing: false,
                 quality: 0.8,
             });
+
+            console.log('📊 [handleUpload] Resultado del selector:', { canceled: result.canceled, assetsCount: result.assets?.length });
 
             if (!result.canceled && result.assets[0]) {
                 setIsUploading(true);
                 const imageUri = result.assets[0].uri;
+
+                console.log('🎯 [handleUpload] Imagen seleccionada:', imageUri);
+                console.log('📂 [handleUpload] Categoría seleccionada:', selectedTab);
 
                 // Get garment type based on category
                 const typeMap: Record<GarmentCategory, string> = {
@@ -99,28 +116,53 @@ export default function WardrobeManagementScreen() {
                     footwear: 'Zapatillas',
                 };
 
+                const garmentType = typeMap[selectedTab];
+                const garmentDescription = `${garmentType} - ${new Date().toLocaleDateString()}`;
+
+                console.log('📝 [handleUpload] Tipo de prenda:', garmentType);
+                console.log('📝 [handleUpload] Descripción:', garmentDescription);
+                console.log('⏳ [handleUpload] Llamando a createGarment...');
+
                 const { data, error } = await createGarment(
                     user.id,
                     selectedTab,
-                    typeMap[selectedTab],
-                    `${typeMap[selectedTab]} - ${new Date().toLocaleDateString()}`,
+                    garmentType,
+                    garmentDescription,
                     imageUri
                 );
 
                 if (error) {
-                    showAlert('Error', 'No se pudo subir la prenda');
+                    console.error('❌ [handleUpload] Error recibido de createGarment:');
+                    console.error('Error completo:', JSON.stringify(error, null, 2));
+                    console.error('Error.message:', error.message);
+                    console.error('Error.code:', error.code);
+                    console.error('Error.details:', error.details);
+                    console.error('Error.hint:', error.hint);
+                    showAlert('Error', `No se pudo subir la prenda: ${error.message || 'Error desconocido'}`);
                     return;
                 }
 
                 if (data) {
+                    console.log('✅ [handleUpload] Prenda subida exitosamente:', data);
                     setGarments([data, ...garments]);
                     showAlert('¡Éxito!', 'Prenda agregada a tu guardarropa');
+                } else {
+                    console.warn('⚠️ [handleUpload] No se recibió data ni error');
                 }
+            } else {
+                console.log('ℹ️ [handleUpload] Usuario canceló la selección de imagen');
             }
         } catch (error) {
-            console.error('Error uploading garment:', error);
-            showAlert('Error', 'Ocurrió un error al subir la prenda');
+            console.error('❌ [handleUpload] ERROR GENERAL EN HANDLEUPLOAD:');
+            console.error('Error completo:', error);
+            if (error instanceof Error) {
+                console.error('Error.name:', error.name);
+                console.error('Error.message:', error.message);
+                console.error('Error.stack:', error.stack);
+            }
+            showAlert('Error', `Ocurrió un error al subir la prenda: ${error instanceof Error ? error.message : 'Error desconocido'}`);
         } finally {
+            console.log('🏁 [handleUpload] Finalizando proceso de subida');
             setIsUploading(false);
         }
     };
@@ -157,11 +199,7 @@ export default function WardrobeManagementScreen() {
 
             {/* Header */}
             <View style={styles.header}>
-                <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-                    <MaterialIcons name="arrow-back" size={24} color="#1A1A1A" />
-                </TouchableOpacity>
                 <Text style={styles.headerTitle}>Mi Guardarropa</Text>
-                <View style={styles.headerSpacer} />
             </View>
 
             {/* Tabs */}
@@ -207,8 +245,8 @@ export default function WardrobeManagementScreen() {
                     </View>
                 ) : (
                     <View style={styles.grid}>
-                        {filteredGarments.map((garment) => (
-                            <View key={garment.id} style={styles.garmentCard}>
+                        {filteredGarments.map((garment, index) => (
+                            <View key={`garment-${garment.id}-${index}`} style={styles.garmentCard}>
                                 <Image source={{ uri: garment.image_url }} style={styles.garmentImage} />
                                 <TouchableOpacity
                                     style={styles.deleteButton}
@@ -258,29 +296,17 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
     },
     header: {
-        flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
+        justifyContent: 'center',
         paddingHorizontal: 16,
         paddingVertical: 12,
         borderBottomWidth: 1,
         borderBottomColor: '#EFEFEF',
     },
-    backButton: {
-        width: 48,
-        height: 48,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
     headerTitle: {
         fontSize: 18,
         fontWeight: '700',
         color: '#1A1A1A',
-        flex: 1,
-        textAlign: 'center',
-    },
-    headerSpacer: {
-        width: 48,
     },
     tabsContainer: {
         flexDirection: 'row',
