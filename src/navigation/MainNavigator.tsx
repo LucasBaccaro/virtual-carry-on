@@ -1,5 +1,6 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 
@@ -8,10 +9,12 @@ import HomeScreen from '../screens/main/HomeScreen';
 import WardrobeScreen from '../screens/main/WardrobeScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import ManageCategoriesScreen from '../screens/main/ManageCategoriesScreen';
+import WardrobeManagementScreen from '../screens/main/WardrobeManagementScreen';
 
 const Tab = createBottomTabNavigator();
+const Stack = createNativeStackNavigator();
 
-export default function MainNavigator() {
+function TabNavigator() {
     const insets = useSafeAreaInsets();
 
     return (
@@ -75,5 +78,14 @@ export default function MainNavigator() {
                 }}
             />
         </Tab.Navigator>
+    );
+}
+
+export default function MainNavigator() {
+    return (
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="MainTabs" component={TabNavigator} />
+            <Stack.Screen name="WardrobeManagement" component={WardrobeManagementScreen} />
+        </Stack.Navigator>
     );
 }

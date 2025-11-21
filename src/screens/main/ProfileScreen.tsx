@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, StatusBar, TouchableOpacity, Image, ActivityInd
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { useNavigation } from '@react-navigation/native';
 import { colors, typography, spacing, borderRadius } from '../../constants/theme';
 import { useUserPhoto } from '../../context/UserPhotoContext';
 import { useAuth } from '../../context/AuthContext';
@@ -10,9 +11,9 @@ import { mockUser } from '../../constants/mockData';
 import CustomAlert from '../../components/CustomAlert';
 
 export default function ProfileScreen() {
-    const { userPhotoUri, setUserPhoto, removeUserPhoto, isLoading } = useUserPhoto();
+    const navigation = useNavigation();
+    const { userPhotoUri, setUserPhoto, isLoading, isUploading } = useUserPhoto();
     const { signOut } = useAuth();
-    const [uploading, setUploading] = useState(false);
 
     // Alert State
     const [alertVisible, setAlertVisible] = useState(false);
@@ -56,7 +57,6 @@ export default function ProfileScreen() {
         const hasPermission = await requestPermissions('camera');
         if (!hasPermission) return;
 
-        setUploading(true);
         try {
             const result = await ImagePicker.launchCameraAsync({
                 mediaTypes: ['images'],
@@ -71,8 +71,6 @@ export default function ProfileScreen() {
             }
         } catch (error) {
             showAlert('Error', 'Could not take photo');
-        } finally {
-            setUploading(false);
         }
     };
 
@@ -80,7 +78,6 @@ export default function ProfileScreen() {
         const hasPermission = await requestPermissions('library');
         if (!hasPermission) return;
 
-        setUploading(true);
         try {
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ['images'],
@@ -95,41 +92,10 @@ export default function ProfileScreen() {
             }
         } catch (error) {
             showAlert('Error', 'Could not select photo');
-        } finally {
-            setUploading(false);
         }
     };
 
-    const handleRemovePhoto = () => {
-        showAlert(
-            'Delete Photo',
-            'Are you sure you want to delete your photo?',
-            [
-                { text: 'Cancel', style: 'cancel', onPress: () => setAlertVisible(false) },
-                {
-                    text: 'Delete',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            await removeUserPhoto();
-                            setAlertVisible(false); // Close confirmation
-                            // Show success after a brief delay or immediately?
-                            // Alert.alert was blocking, CustomAlert is not.
-                            // We can just show another alert.
-                            setTimeout(() => {
-                                showAlert('Deleted', 'Default photo will be used');
-                            }, 300);
-                        } catch (error) {
-                            setAlertVisible(false);
-                            setTimeout(() => {
-                                showAlert('Error', 'Could not delete photo');
-                            }, 300);
-                        }
-                    },
-                },
-            ]
-        );
-    };
+    // Note: Profile photo deletion now handled through re-uploading a different photo
 
     const displayImage = userPhotoUri || mockUser.image;
     const isCustomPhoto = !!userPhotoUri;
@@ -148,7 +114,7 @@ export default function ProfileScreen() {
                 {/* Photo Card */}
                 <View style={styles.photoCardContainer}>
                     <View style={styles.photoCard}>
-                        {uploading || isLoading ? (
+                        {isUploading || isLoading ? (
                             <View style={styles.photoPlaceholder}>
                                 <ActivityIndicator size="large" color="#000000" />
                             </View>
@@ -159,7 +125,7 @@ export default function ProfileScreen() {
                                 resizeMode="cover"
                             />
                         )}
-                        {isCustomPhoto && !uploading && (
+                        {isCustomPhoto && !isUploading && (
                             <View style={styles.badge}>
                                 <MaterialIcons name="check" size={16} color="#FFFFFF" />
                             </View>
@@ -172,7 +138,7 @@ export default function ProfileScreen() {
                     <TouchableOpacity
                         style={styles.actionButton}
                         onPress={handleTakePhoto}
-                        disabled={uploading}
+                        disabled={isUploading}
                     >
                         <View style={styles.iconContainer}>
                             <MaterialIcons name="photo-camera" size={24} color="#000000" />
@@ -193,19 +159,16 @@ export default function ProfileScreen() {
                         <MaterialIcons name="chevron-right" size={24} color="rgba(0,0,0,0.5)" />
                     </TouchableOpacity>
 
-                    {isCustomPhoto && (
-                        <TouchableOpacity
-                            style={[styles.actionButton, styles.deleteButton]}
-                            onPress={handleRemovePhoto}
-                            disabled={uploading}
-                        >
-                            <View style={styles.iconContainer}>
-                                <MaterialIcons name="delete-outline" size={24} color="#000000" />
-                            </View>
-                            <Text style={styles.actionButtonText}>Eliminar Foto</Text>
-                            <MaterialIcons name="chevron-right" size={24} color="rgba(0,0,0,0.5)" />
-                        </TouchableOpacity>
-                    )}
+                    <TouchableOpacity
+                        style={styles.actionButton}
+                        onPress={() => navigation.navigate('WardrobeManagement')}
+                    >
+                        <View style={styles.iconContainer}>
+                            <MaterialIcons name="checkroom" size={24} color="#000000" />
+                        </View>
+                        <Text style={styles.actionButtonText}>Gestionar Guardarropa</Text>
+                        <MaterialIcons name="chevron-right" size={24} color="rgba(0,0,0,0.5)" />
+                    </TouchableOpacity>
                 </View>
 
                 {/* Logout Button */}

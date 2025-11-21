@@ -1,31 +1,46 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from './AuthContext';
+import { getProfile, updateProfilePhoto } from '../services/supabaseService';
 
 interface UserPhotoContextType {
     userPhotoUri: string | null;
     setUserPhoto: (uri: string) => Promise<void>;
-    removeUserPhoto: () => Promise<void>;
     isLoading: boolean;
+    isUploading: boolean;
 }
 
 const UserPhotoContext = createContext<UserPhotoContextType | undefined>(undefined);
 
-const STORAGE_KEY = '@smartfit_user_photo';
-
 export function UserPhotoProvider({ children }: { children: ReactNode }) {
+    const { user } = useAuth();
     const [userPhotoUri, setUserPhotoUri] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [isUploading, setIsUploading] = useState(false);
 
-    // Load saved photo on mount
+    // Load user photo when user changes
     useEffect(() => {
-        loadUserPhoto();
-    }, []);
+        if (user) {
+            loadUserPhoto();
+        } else {
+            setUserPhotoUri(null);
+            setIsLoading(false);
+        }
+    }, [user]);
 
     const loadUserPhoto = async () => {
+        if (!user) return;
+
         try {
-            const stored = await AsyncStorage.getItem(STORAGE_KEY);
-            if (stored) {
-                setUserPhotoUri(stored);
+            setIsLoading(true);
+            const { data, error } = await getProfile(user.id);
+
+            if (error) {
+                console.error('Error loading profile:', error);
+                return;
+            }
+
+            if (data?.full_body_photo_url) {
+                setUserPhotoUri(data.full_body_photo_url);
             }
         } catch (error) {
             console.error('Error loading user photo:', error);
@@ -35,27 +50,34 @@ export function UserPhotoProvider({ children }: { children: ReactNode }) {
     };
 
     const setUserPhoto = async (uri: string) => {
+        if (!user) throw new Error('User not authenticated');
+
         try {
-            setUserPhotoUri(uri);
-            await AsyncStorage.setItem(STORAGE_KEY, uri);
+            setIsUploading(true);
+            const { data, error } = await updateProfilePhoto(user.id, uri);
+
+            if (error) throw error;
+
+            if (data) {
+                setUserPhotoUri(data);
+            }
         } catch (error) {
             console.error('Error saving user photo:', error);
             throw error;
-        }
-    };
-
-    const removeUserPhoto = async () => {
-        try {
-            setUserPhotoUri(null);
-            await AsyncStorage.removeItem(STORAGE_KEY);
-        } catch (error) {
-            console.error('Error removing user photo:', error);
-            throw error;
+        } finally {
+            setIsUploading(false);
         }
     };
 
     return (
-        <UserPhotoContext.Provider value={{ userPhotoUri, setUserPhoto, removeUserPhoto, isLoading }}>
+        <UserPhotoContext.Provider
+            value={{
+                userPhotoUri,
+                setUserPhoto,
+                isLoading,
+                isUploading,
+            }}
+        >
             {children}
         </UserPhotoContext.Provider>
     );

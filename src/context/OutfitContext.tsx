@@ -1,141 +1,216 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImageManipulator from 'expo-image-manipulator';
-import { Category } from '../types';
+import { useAuth } from './AuthContext';
+import {
+    getCategories,
+    createCategory,
+    updateCategory as updateCategoryService,
+    deleteCategory,
+    getOutfits,
+    saveOutfit as saveOutfitService,
+    deleteOutfit,
+    OutfitCategory,
+    SavedOutfit as SupabaseOutfit,
+} from '../services/supabaseService';
 
 export interface SavedOutfit {
     id: string;
-    imageBase64: string;
-    timestamp: number;
+    imageUrl: string;
+    timestamp: string;
     modelUsed: 'gemini-3-pro' | 'gemini-2.5-flash';
     categoryId?: string;
-    garments: {
-        upper?: {
-            type: string;
-            description: string;
-        };
-        lower?: {
-            type: string;
-            description: string;
-        };
-        footwear?: {
-            type: string;
-            description: string;
-        };
-    };
+    garmentIds: string[];
+}
+
+export interface Category {
+    id: string;
+    name: string;
 }
 
 interface OutfitContextType {
     savedOutfits: SavedOutfit[];
-    saveOutfit: (outfit: Omit<SavedOutfit, 'id' | 'timestamp'>) => Promise<void>;
-    removeOutfit: (id: string) => Promise<void>;
+    saveOutfit: (outfit: {
+        imageBase64: string;
+        modelUsed: 'gemini-3-pro' | 'gemini-2.5-flash';
+        garmentIds: string[];
+        categoryId?: string;
+    }) => Promise<void>;
+    removeOutfit: (id: string, imageUrl: string) => Promise<void>;
     categories: Category[];
     addCategory: (name: string) => Promise<void>;
     removeCategory: (id: string) => Promise<void>;
     updateCategory: (id: string, name: string) => Promise<void>;
     isLoading: boolean;
+    isRefreshing: boolean;
+    refreshOutfits: () => Promise<void>;
+    refreshCategories: () => Promise<void>;
 }
 
 const OutfitContext = createContext<OutfitContextType | undefined>(undefined);
 
-const STORAGE_KEY = '@smartfit_saved_outfits';
-const CATEGORIES_KEY = '@smartfit_categories';
-
-const DEFAULT_CATEGORIES: Category[] = [
-    { id: '1', name: 'Work Outfits' },
-    { id: '2', name: 'Summer Vacation' },
-    { id: '3', name: 'Formal Events' },
-    { id: '4', name: 'Weekend Casual' },
-];
-
 export function OutfitProvider({ children }: { children: ReactNode }) {
+    const { user } = useAuth();
     const [savedOutfits, setSavedOutfits] = useState<SavedOutfit[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
-    // Load data on mount
+    // Load data when user changes
     useEffect(() => {
-        loadData();
-    }, []);
+        if (user) {
+            loadData();
+        } else {
+            // Clear data when user logs out
+            setSavedOutfits([]);
+            setCategories([]);
+            setIsLoading(false);
+        }
+    }, [user]);
 
     const loadData = async () => {
+        if (!user) return;
+
         try {
-            const [storedOutfits, storedCategories] = await Promise.all([
-                AsyncStorage.getItem(STORAGE_KEY),
-                AsyncStorage.getItem(CATEGORIES_KEY)
+            setIsLoading(true);
+            const [outfitsResult, categoriesResult] = await Promise.all([
+                getOutfits(user.id),
+                getCategories(user.id),
             ]);
 
-            if (storedOutfits) {
-                const outfits = JSON.parse(storedOutfits);
-                setSavedOutfits(outfits);
+            if (outfitsResult.data) {
+                const formattedOutfits: SavedOutfit[] = outfitsResult.data.map((outfit) => ({
+                    id: outfit.id,
+                    imageUrl: outfit.image_url,
+                    timestamp: outfit.created_at,
+                    modelUsed: outfit.model_used,
+                    categoryId: outfit.category_id || undefined,
+                    garmentIds: outfit.garment_ids || [],
+                }));
+                setSavedOutfits(formattedOutfits);
             }
 
-            if (storedCategories) {
-                setCategories(JSON.parse(storedCategories));
-            } else {
-                // Initialize default categories
-                setCategories(DEFAULT_CATEGORIES);
-                await AsyncStorage.setItem(CATEGORIES_KEY, JSON.stringify(DEFAULT_CATEGORIES));
+            if (categoriesResult.data) {
+                const formattedCategories: Category[] = categoriesResult.data.map((cat) => ({
+                    id: cat.id,
+                    name: cat.name,
+                }));
+                setCategories(formattedCategories);
             }
         } catch (error) {
             console.error('Error loading data:', error);
-            // Handle corruption if needed
-            if (error instanceof Error && error.message.includes('Row too big')) {
-                console.log('Clearing corrupted storage...');
-                await AsyncStorage.removeItem(STORAGE_KEY);
-                setSavedOutfits([]);
-            }
         } finally {
             setIsLoading(false);
         }
     };
 
+    const refreshOutfits = async () => {
+        if (!user) return;
+
+        try {
+            setIsRefreshing(true);
+            const result = await getOutfits(user.id);
+
+            if (result.data) {
+                const formattedOutfits: SavedOutfit[] = result.data.map((outfit) => ({
+                    id: outfit.id,
+                    imageUrl: outfit.image_url,
+                    timestamp: outfit.created_at,
+                    modelUsed: outfit.model_used,
+                    categoryId: outfit.category_id || undefined,
+                    garmentIds: outfit.garment_ids || [],
+                }));
+                setSavedOutfits(formattedOutfits);
+            }
+        } catch (error) {
+            console.error('Error refreshing outfits:', error);
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
+
+    const refreshCategories = async () => {
+        if (!user) return;
+
+        try {
+            setIsRefreshing(true);
+            const result = await getCategories(user.id);
+
+            if (result.data) {
+                const formattedCategories: Category[] = result.data.map((cat) => ({
+                    id: cat.id,
+                    name: cat.name,
+                }));
+                setCategories(formattedCategories);
+            }
+        } catch (error) {
+            console.error('Error refreshing categories:', error);
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
+
     const compressImage = async (base64Image: string): Promise<string> => {
         try {
-            // Convert base64 to URI
             const uri = `data:image/jpeg;base64,${base64Image}`;
 
-            // Compress image to reduce size
             const manipResult = await ImageManipulator.manipulateAsync(
                 uri,
-                [{ resize: { width: 800 } }], // Resize to max width 800px
+                [{ resize: { width: 800 } }],
                 { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
             );
 
             return manipResult.base64 || base64Image;
         } catch (error) {
             console.error('Error compressing image:', error);
-            // If compression fails, return original
             return base64Image;
         }
     };
 
-    const saveOutfit = async (outfit: Omit<SavedOutfit, 'id' | 'timestamp'>) => {
+    const saveOutfit = async (outfit: {
+        imageBase64: string;
+        modelUsed: 'gemini-3-pro' | 'gemini-2.5-flash';
+        garmentIds: string[];
+        categoryId?: string;
+    }) => {
+        if (!user) throw new Error('User not authenticated');
+
         try {
-            // Compress image before saving
+            // Compress image before uploading
             const compressedImage = await compressImage(outfit.imageBase64);
 
-            const newOutfit: SavedOutfit = {
-                ...outfit,
-                imageBase64: compressedImage,
-                id: Date.now().toString(),
-                timestamp: Date.now(),
-            };
+            const { data, error } = await saveOutfitService(
+                user.id,
+                compressedImage,
+                outfit.modelUsed,
+                outfit.garmentIds,
+                outfit.categoryId
+            );
 
-            const updatedOutfits = [newOutfit, ...savedOutfits];
-            setSavedOutfits(updatedOutfits);
-            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedOutfits));
+            if (error) throw error;
+
+            if (data) {
+                const newOutfit: SavedOutfit = {
+                    id: data.id,
+                    imageUrl: data.image_url,
+                    timestamp: data.created_at,
+                    modelUsed: data.model_used,
+                    categoryId: data.category_id || undefined,
+                    garmentIds: data.garment_ids || [],
+                };
+                setSavedOutfits([newOutfit, ...savedOutfits]);
+            }
         } catch (error) {
             console.error('Error saving outfit:', error);
             throw error;
         }
     };
 
-    const removeOutfit = async (id: string) => {
+    const removeOutfit = async (id: string, imageUrl: string) => {
         try {
-            const updatedOutfits = savedOutfits.filter(outfit => outfit.id !== id);
-            setSavedOutfits(updatedOutfits);
-            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedOutfits));
+            const { error } = await deleteOutfit(id, imageUrl);
+            if (error) throw error;
+
+            setSavedOutfits(savedOutfits.filter((outfit) => outfit.id !== id));
         } catch (error) {
             console.error('Error removing outfit:', error);
             throw error;
@@ -143,14 +218,19 @@ export function OutfitProvider({ children }: { children: ReactNode }) {
     };
 
     const addCategory = async (name: string) => {
+        if (!user) throw new Error('User not authenticated');
+
         try {
-            const newCategory: Category = {
-                id: Date.now().toString(),
-                name,
-            };
-            const updatedCategories = [...categories, newCategory];
-            setCategories(updatedCategories);
-            await AsyncStorage.setItem(CATEGORIES_KEY, JSON.stringify(updatedCategories));
+            const { data, error } = await createCategory(user.id, name);
+            if (error) throw error;
+
+            if (data) {
+                const newCategory: Category = {
+                    id: data.id,
+                    name: data.name,
+                };
+                setCategories([...categories, newCategory]);
+            }
         } catch (error) {
             console.error('Error adding category:', error);
             throw error;
@@ -159,9 +239,10 @@ export function OutfitProvider({ children }: { children: ReactNode }) {
 
     const removeCategory = async (id: string) => {
         try {
-            const updatedCategories = categories.filter(c => c.id !== id);
-            setCategories(updatedCategories);
-            await AsyncStorage.setItem(CATEGORIES_KEY, JSON.stringify(updatedCategories));
+            const { error } = await deleteCategory(id);
+            if (error) throw error;
+
+            setCategories(categories.filter((c) => c.id !== id));
         } catch (error) {
             console.error('Error removing category:', error);
             throw error;
@@ -170,11 +251,10 @@ export function OutfitProvider({ children }: { children: ReactNode }) {
 
     const updateCategory = async (id: string, name: string) => {
         try {
-            const updatedCategories = categories.map(c =>
-                c.id === id ? { ...c, name } : c
-            );
-            setCategories(updatedCategories);
-            await AsyncStorage.setItem(CATEGORIES_KEY, JSON.stringify(updatedCategories));
+            const { error } = await updateCategoryService(id, name);
+            if (error) throw error;
+
+            setCategories(categories.map((c) => (c.id === id ? { ...c, name } : c)));
         } catch (error) {
             console.error('Error updating category:', error);
             throw error;
@@ -182,16 +262,21 @@ export function OutfitProvider({ children }: { children: ReactNode }) {
     };
 
     return (
-        <OutfitContext.Provider value={{
-            savedOutfits,
-            saveOutfit,
-            removeOutfit,
-            categories,
-            addCategory,
-            removeCategory,
-            updateCategory,
-            isLoading
-        }}>
+        <OutfitContext.Provider
+            value={{
+                savedOutfits,
+                saveOutfit,
+                removeOutfit,
+                categories,
+                addCategory,
+                removeCategory,
+                updateCategory,
+                isLoading,
+                isRefreshing,
+                refreshOutfits,
+                refreshCategories,
+            }}
+        >
             {children}
         </OutfitContext.Provider>
     );

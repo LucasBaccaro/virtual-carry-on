@@ -23,9 +23,9 @@ export default function HomeScreen() {
         ? savedOutfits
         : savedOutfits.filter(outfit => outfit.categoryId === selectedCategory);
 
-    const formatDate = (timestamp: number) => {
+    const formatDate = (timestamp: string) => {
         const date = new Date(timestamp);
-        return date.toLocaleDateString('en-US', {
+        return date.toLocaleDateString('es-ES', {
             month: 'short',
             day: 'numeric',
             year: 'numeric'
@@ -40,7 +40,10 @@ export default function HomeScreen() {
     const handleDelete = async () => {
         if (outfitToDelete) {
             try {
-                await removeOutfit(outfitToDelete);
+                const outfit = savedOutfits.find(o => o.id === outfitToDelete);
+                if (outfit) {
+                    await removeOutfit(outfitToDelete, outfit.imageUrl);
+                }
             } catch (error) {
                 console.error('Error deleting outfit:', error);
             } finally {
@@ -64,7 +67,7 @@ export default function HomeScreen() {
         return (
             <View style={styles.card}>
                 <Image
-                    source={{ uri: `data:image/jpeg;base64,${outfit.imageBase64}` }}
+                    source={{ uri: outfit.imageUrl }}
                     style={styles.cardImage}
                     resizeMode="cover"
                 />
