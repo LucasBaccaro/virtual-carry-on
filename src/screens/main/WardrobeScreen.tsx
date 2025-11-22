@@ -37,6 +37,7 @@ export default function WardrobeScreen({ route }: any) {
 
     // Generation state
     const [isGenerating, setIsGenerating] = useState(false);
+    const [loadingStep, setLoadingStep] = useState<string>(''); // 'analyzing', 'lighting', 'generating'
     const [generatedImageBase64, setGeneratedImageBase64] = useState<string | null>(null);
     const [selectedModel, setSelectedModel] = useState<'gemini-3-pro' | 'gemini-2.5-flash'>('gemini-3-pro');
     const [categoryModalVisible, setCategoryModalVisible] = useState(false);
@@ -157,7 +158,13 @@ export default function WardrobeScreen({ route }: any) {
         }
 
         setIsGenerating(true);
+        setLoadingStep('analyzing');
+
         try {
+            // Simulate steps for better UX
+            setTimeout(() => setLoadingStep('lighting'), 2000);
+            setTimeout(() => setLoadingStep('generating'), 4500);
+
             const upperItem = upperGarments.find(i => i.id === selectedUpper);
             const lowerItem = lowerGarments.find(i => i.id === selectedLower);
             const footwearItem = footwearGarments.find(i => i.id === selectedFootwear);
@@ -197,6 +204,7 @@ export default function WardrobeScreen({ route }: any) {
             showAlert('Error', 'Ocurrió un error al conectar con el servidor.');
         } finally {
             setIsGenerating(false);
+            setLoadingStep('');
         }
     };
 
@@ -369,7 +377,12 @@ export default function WardrobeScreen({ route }: any) {
                         {isGenerating ? (
                             <View style={styles.centerContent}>
                                 <ActivityIndicator size="large" color="#000000" />
-                                <Text style={styles.loadingText}>Generando tu look...</Text>
+                                <Text style={styles.loadingText}>
+                                    {loadingStep === 'analyzing' && 'Analizando prendas...'}
+                                    {loadingStep === 'lighting' && 'Ajustando iluminación...'}
+                                    {loadingStep === 'generating' && 'Generando imagen...'}
+                                    {!loadingStep && 'Procesando...'}
+                                </Text>
                             </View>
                         ) : (
                             <>

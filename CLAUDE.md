@@ -130,3 +130,55 @@ EXPO_PUBLIC_GOOGLE_API_KEY=your_gemini_api_key
 - **Typography**: Consistent font sizes and weights.
 - **Components**: Reusable components in `src/components` (GlobalHeader, PageHeader, CustomAlert, etc.).
 - **Icons**: MaterialIcons from `@expo/vector-icons`.
+
+## Machine Learning & AI Features
+
+### 1. Garment Analysis (`src/services/garmentAnalysis.ts`)
+- **Model**: Gemini 2.5 Flash (Multimodal).
+- **Functionality**: Analyzes uploaded garment photos to extract metadata automatically.
+- **Extracted Data**:
+  - Color (e.g., "Navy Blue")
+  - Type/Category (e.g., "T-Shirt", "Jeans")
+  - Occasion (e.g., "Casual", "Formal")
+  - Season (e.g., "Summer", "Winter")
+  - Style (e.g., "Minimalist", "Streetwear")
+  - Versatility Score (1-10)
+
+### 2. Fashion Agent (`src/services/fashionAgent.ts`)
+- **Model**: Gemini 2.0 Flash Exp.
+- **Functionality**: Conversational AI assistant that acts as a personal stylist.
+- **Features**:
+  - Natural language chat interface (`FashionAgentScreen`).
+  - Context-aware responses based on user's wardrobe.
+  - **Tool Use**: Can autonomously call the recommendation engine when the user asks for outfits.
+  - Maintains conversation history for continuity.
+
+### 3. Intelligent Recommendations (`src/services/fashionRecommendations.ts`)
+- **Model**: Gemini 2.5 Flash.
+- **Functionality**: Generates outfit combinations from the user's existing wardrobe.
+- **Logic**:
+  - Takes user request (e.g., "something for a date night") + list of available garments.
+  - Selects the best combination (Upper + Lower + Footwear).
+  - Provides a "Match Score" and reasoning for the choice.
+  - **Manual Flow**: Users can also request recommendations directly via the "Regenerar" button in `RecommendationsScreen`.
+
+### 4. Virtual Try-On (Enhanced)
+- **Integration**: The "Try On" feature is now integrated into the recommendation cards.
+- **Flow**: User accepts a recommendation -> App navigates to `WardrobeScreen` with garments pre-selected -> Auto-generates the try-on image.
+
+## Updated Architecture
+
+### New Services
+- `garmentAnalysis.ts`: AI analysis of single garments.
+- `fashionAgent.ts`: Chatbot logic and state management.
+- `fashionRecommendations.ts`: Core recommendation engine.
+
+### New Screens
+- `FashionAgentScreen`: Chat interface for the AI stylist.
+- `RecommendationsScreen`: Displays AI-generated outfit suggestions.
+
+### Database Updates
+- **garments** table updated with new columns:
+  - `metadata`: JSONB (stores AI analysis results).
+  - `usage_count`: Integer (tracks how often a garment is worn).
+  - `last_worn`: Timestamptz.
