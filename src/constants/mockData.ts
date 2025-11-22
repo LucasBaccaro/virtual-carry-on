@@ -47,7 +47,7 @@ export const mockGarments: Garment[] = [
         type: 'upper_body',
         description: 'Camisa negra elegante',
         fit: 'slim',
-        image: require('../../assets/images/shirt_black.png'),
+        image: require('../../assets/images/shirt_black.jpg'),
     },
     {
         id: '6',
@@ -55,7 +55,7 @@ export const mockGarments: Garment[] = [
         type: 'upper_body',
         description: 'Camisa azul claro de vestir',
         fit: 'regular',
-        image: require('../../assets/images/shirt_blue.png'),
+        image: require('../../assets/images/shirt_blue.jpg'),
     },
     // Pantalones
     {
@@ -64,7 +64,7 @@ export const mockGarments: Garment[] = [
         type: 'lower_body',
         description: 'Jeans azul clásico',
         fit: 'regular',
-        image: require('../../assets/images/jeans.png'),
+        image: require('../../assets/images/jeans.jpg'),
     },
     {
         id: '8',
