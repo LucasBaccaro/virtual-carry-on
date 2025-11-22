@@ -13,6 +13,7 @@ import ManageCategoriesScreen from '../screens/main/ManageCategoriesScreen';
 import ClosetScreen from '../screens/main/ClosetScreen';
 import RecommendationsScreen from '../screens/main/RecommendationsScreen';
 import FashionAgentScreen from '../screens/main/FashionAgentScreen';
+import EditGarmentScreen from '../screens/main/EditGarmentScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -80,6 +81,16 @@ function TabNavigator() {
                     ),
                 }}
             />
+            <Tab.Screen
+                name="Profile"
+                component={ProfileScreen}
+                options={{
+                    tabBarLabel: 'Profile',
+                    tabBarIcon: ({ color, size, focused }) => (
+                        <MaterialIcons name={focused ? "person" : "person-outline"} size={size} color={color} />
+                    ),
+                }}
+            />
         </Tab.Navigator>
     );
 }
@@ -88,8 +99,8 @@ export default function MainNavigator() {
     return (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="MainTabs" component={TabNavigator} />
-            <Stack.Screen name="Profile" component={ProfileScreen} />
             <Stack.Screen name="ManageCategories" component={ManageCategoriesScreen} />
+            <Stack.Screen name="EditGarment" component={EditGarmentScreen} />
             <Stack.Screen
                 name="FashionAgent"
                 component={FashionAgentScreen}

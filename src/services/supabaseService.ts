@@ -151,6 +151,143 @@ export const getGarments = async (
     return { data, error };
 };
 
+// NEW: Process garment image (remove background + AI analysis) WITHOUT saving to DB
+export const processGarmentImage = async (
+    imageUri: string,
+    category: 'upper' | 'lower' | 'footwear' | 'one-piece',
+    type: string,
+    description: string
+): Promise<{
+    success: boolean;
+    imageBase64?: string;
+    metadata?: any;
+    aiAnalysis?: any;
+    error?: any;
+}> => {
+    try {
+        console.log('🔵 [processGarmentImage] Iniciando procesamiento de imagen...');
+
+        // STEP 1: Remove background using Gemini AI
+        console.log('🎨 [processGarmentImage] Removiendo fondo con Gemini AI...');
+        const bgRemovalResult = await removeBackground(imageUri);
+
+        let base64: string;
+
+        if (bgRemovalResult.success && bgRemovalResult.imageBase64) {
+            console.log('✅ [processGarmentImage] Fondo removido exitosamente');
+            base64 = bgRemovalResult.imageBase64;
+        } else {
+            console.warn('⚠️ [processGarmentImage] No se pudo remover el fondo, usando imagen original');
+            console.warn('Error:', bgRemovalResult.error);
+
+            // Fallback: use original image
+            console.log('🖼️ [processGarmentImage] Leyendo imagen original como base64...');
+            base64 = await FileSystem.readAsStringAsync(imageUri, {
+                encoding: 'base64',
+            });
+        }
+
+        // STEP 2: Analyze garment with AI to extract metadata
+        console.log('🤖 [processGarmentImage] Analizando prenda con IA...');
+        let metadata = {};
+        let aiAnalysis = {};
+
+        try {
+            const { analyzeGarmentWithAI } = await import('./garmentAnalysis');
+            const analysis = await analyzeGarmentWithAI(base64, category, type, description);
+            metadata = analysis.metadata;
+            aiAnalysis = analysis.aiAnalysis;
+            console.log('✅ [processGarmentImage] Análisis IA completado');
+        } catch (analysisError) {
+            console.warn('⚠️ [processGarmentImage] Error en análisis IA, continuando sin metadata:', analysisError);
+        }
+
+        console.log('✅ [processGarmentImage] Procesamiento completado exitosamente');
+        return {
+            success: true,
+            imageBase64: base64,
+            metadata,
+            aiAnalysis,
+        };
+    } catch (error) {
+        console.error('❌ [processGarmentImage] ERROR GENERAL:');
+        console.error('Error completo:', error);
+        return {
+            success: false,
+            error,
+        };
+    }
+};
+
+// NEW: Save processed garment to database
+export const saveProcessedGarment = async (
+    userId: string,
+    category: 'upper' | 'lower' | 'footwear' | 'one-piece',
+    type: string,
+    description: string,
+    imageBase64: string,
+    metadata: any = {},
+    aiAnalysis: any = {}
+): Promise<{ data: Garment | null; error: any }> => {
+    try {
+        console.log('🔵 [saveProcessedGarment] Guardando prenda procesada...');
+
+        // Upload to Supabase Storage
+        const fileExt = 'jpg';
+        const fileName = `${Date.now()}.${fileExt}`;
+        const filePath = `${userId}/${category}/${fileName}`;
+
+        console.log('☁️ [saveProcessedGarment] Subiendo a Supabase Storage...');
+        const { error: uploadError } = await supabase.storage
+            .from('garment-images')
+            .upload(filePath, decode(imageBase64), {
+                contentType: `image/${fileExt}`,
+            });
+
+        if (uploadError) {
+            console.error('❌ [saveProcessedGarment] ERROR AL SUBIR IMAGEN:');
+            console.error('Error:', uploadError);
+            throw uploadError;
+        }
+
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+            .from('garment-images')
+            .getPublicUrl(filePath);
+
+        console.log('🔗 [saveProcessedGarment] URL pública:', publicUrl);
+
+        // Insert into database
+        console.log('💾 [saveProcessedGarment] Insertando en base de datos...');
+        const { data, error } = await supabase
+            .from('garments')
+            .insert({
+                user_id: userId,
+                category,
+                type,
+                description,
+                image_url: publicUrl,
+                metadata,
+                ai_analysis: aiAnalysis,
+                usage_count: 0,
+            })
+            .select()
+            .single();
+
+        if (error) {
+            console.error('❌ [saveProcessedGarment] ERROR AL INSERTAR:');
+            console.error('Error:', error);
+            return { data: null, error };
+        }
+
+        console.log('✅ [saveProcessedGarment] Prenda guardada exitosamente');
+        return { data, error: null };
+    } catch (error) {
+        console.error('❌ [saveProcessedGarment] ERROR GENERAL:', error);
+        return { data: null, error };
+    }
+};
+
 export const createGarment = async (
     userId: string,
     category: 'upper' | 'lower' | 'footwear' | 'one-piece',

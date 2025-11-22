@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -9,16 +9,21 @@ import {
     ActivityIndicator,
     StatusBar,
     Alert,
+    Modal,
+    Animated,
+    Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../context/AuthContext';
-import { createGarment, getGarments, deleteGarment, Garment } from '../../services/supabaseService';
+import { createGarment, getGarments, deleteGarment, processGarmentImage, Garment } from '../../services/supabaseService';
 import CustomAlert from '../../components/CustomAlert';
 import CustomDeleteDialog from '../../components/CustomDeleteDialog';
 import { colors, spacing, borderRadius, typography } from '../../constants/theme';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 type GarmentCategory = 'upper' | 'lower' | 'footwear' | 'one-piece';
 
@@ -33,6 +38,10 @@ export default function WardrobeManagementScreen({ hideHeader = false }: Wardrob
     const [garments, setGarments] = useState<Garment[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isUploading, setIsUploading] = useState(false);
+    const [scanningImageUri, setScanningImageUri] = useState<string | null>(null);
+
+    // Scanner animation
+    const scannerPosition = useRef(new Animated.Value(0)).current;
 
     // Alert State
     const [alertVisible, setAlertVisible] = useState(false);
@@ -54,6 +63,28 @@ export default function WardrobeManagementScreen({ hideHeader = false }: Wardrob
     useEffect(() => {
         loadGarments();
     }, [selectedTab]);
+
+    // Start scanner animation when uploading
+    useEffect(() => {
+        if (isUploading) {
+            // Reset and start animation
+            scannerPosition.setValue(0);
+            Animated.loop(
+                Animated.sequence([
+                    Animated.timing(scannerPosition, {
+                        toValue: 1,
+                        duration: 2000,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(scannerPosition, {
+                        toValue: 0,
+                        duration: 2000,
+                        useNativeDriver: true,
+                    }),
+                ])
+            ).start();
+        }
+    }, [isUploading]);
 
     const loadGarments = async () => {
         if (!user) return;
@@ -108,8 +139,11 @@ export default function WardrobeManagementScreen({ hideHeader = false }: Wardrob
             console.log('📊 [handleUpload] Resultado del selector:', { canceled: result.canceled, assetsCount: result.assets?.length });
 
             if (!result.canceled && result.assets[0]) {
-                setIsUploading(true);
                 const imageUri = result.assets[0].uri;
+
+                // Set scanning state
+                setScanningImageUri(imageUri);
+                setIsUploading(true);
 
                 console.log('🎯 [handleUpload] Imagen seleccionada:', imageUri);
                 console.log('📂 [handleUpload] Categoría seleccionada:', selectedTab);
@@ -127,34 +161,34 @@ export default function WardrobeManagementScreen({ hideHeader = false }: Wardrob
 
                 console.log('📝 [handleUpload] Tipo de prenda:', garmentType);
                 console.log('📝 [handleUpload] Descripción:', garmentDescription);
-                console.log('⏳ [handleUpload] Llamando a createGarment...');
+                console.log('⏳ [handleUpload] Procesando imagen con IA...');
 
-                const { data, error } = await createGarment(
-                    user.id,
+                // Process image (remove background + AI analysis) without saving to DB
+                const processResult = await processGarmentImage(
+                    imageUri,
                     selectedTab,
                     garmentType,
-                    garmentDescription,
-                    imageUri
+                    garmentDescription
                 );
 
-                if (error) {
-                    console.error('❌ [handleUpload] Error recibido de createGarment:');
-                    console.error('Error completo:', JSON.stringify(error, null, 2));
-                    console.error('Error.message:', error.message);
-                    console.error('Error.code:', error.code);
-                    console.error('Error.details:', error.details);
-                    console.error('Error.hint:', error.hint);
-                    showAlert('Error', `No se pudo subir la prenda: ${error.message || 'Error desconocido'}`);
+                if (!processResult.success || !processResult.imageBase64) {
+                    console.error('❌ [handleUpload] Error al procesar imagen:', processResult.error);
+                    showAlert('Error', 'No se pudo procesar la imagen. Intenta de nuevo.');
                     return;
                 }
 
-                if (data) {
-                    console.log('✅ [handleUpload] Prenda subida exitosamente:', data);
-                    setGarments([data, ...garments]);
-                    showAlert('¡Éxito!', 'Prenda agregada a tu guardarropa');
-                } else {
-                    console.warn('⚠️ [handleUpload] No se recibió data ni error');
-                }
+                console.log('✅ [handleUpload] Imagen procesada exitosamente');
+                console.log('🧭 [handleUpload] Navegando a EditGarmentScreen...');
+
+                // Navigate to EditGarmentScreen with processed data
+                navigation.navigate('EditGarment' as never, {
+                    imageBase64: processResult.imageBase64,
+                    category: selectedTab,
+                    type: garmentType,
+                    description: garmentDescription,
+                    metadata: processResult.metadata,
+                    aiAnalysis: processResult.aiAnalysis,
+                } as never);
             } else {
                 console.log('ℹ️ [handleUpload] Usuario canceló la selección de imagen');
             }
@@ -170,6 +204,7 @@ export default function WardrobeManagementScreen({ hideHeader = false }: Wardrob
         } finally {
             console.log('🏁 [handleUpload] Finalizando proceso de subida');
             setIsUploading(false);
+            setScanningImageUri(null);
         }
     };
 
@@ -303,6 +338,53 @@ export default function WardrobeManagementScreen({ hideHeader = false }: Wardrob
                 buttons={alertConfig.buttons}
                 onClose={() => setAlertVisible(false)}
             />
+
+            {/* Scanner Modal */}
+            <Modal
+                visible={isUploading && !!scanningImageUri}
+                transparent={true}
+                animationType="fade"
+            >
+                <View style={styles.scannerContainer}>
+                    {/* Background Image with Opacity */}
+                    {scanningImageUri && (
+                        <Image
+                            source={{ uri: scanningImageUri }}
+                            style={styles.scannerImage}
+                            resizeMode="contain"
+                        />
+                    )}
+
+                    {/* Dark Overlay */}
+                    <View style={styles.scannerOverlay} />
+
+                    {/* Scanning Line Animation */}
+                    <Animated.View
+                        style={[
+                            styles.scannerLine,
+                            {
+                                transform: [
+                                    {
+                                        translateY: scannerPosition.interpolate({
+                                            inputRange: [0, 1],
+                                            outputRange: [0, SCREEN_HEIGHT * 0.8],
+                                        }),
+                                    },
+                                ],
+                            },
+                        ]}
+                    >
+                        <View style={styles.scannerLineGlow} />
+                    </Animated.View>
+
+                    {/* Status Text */}
+                    <View style={styles.scannerTextContainer}>
+                        <ActivityIndicator size="large" color="#FFFFFF" />
+                        <Text style={styles.scannerText}>Procesando con IA...</Text>
+                        <Text style={styles.scannerSubtext}>Optimizando tu prenda</Text>
+                    </View>
+                </View>
+            </Modal>
         </>
     );
 
@@ -443,5 +525,58 @@ const styles = StyleSheet.create({
     },
     fabDisabled: {
         opacity: 0.7,
+    },
+    // Scanner Modal Styles
+    scannerContainer: {
+        flex: 1,
+        backgroundColor: '#000000',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    scannerImage: {
+        position: 'absolute',
+        width: '100%',
+        height: '100%',
+        opacity: 1,
+    },
+    scannerOverlay: {
+        position: 'absolute',
+        width: '100%',
+        height: '100%',
+        backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    },
+    scannerLine: {
+        position: 'absolute',
+        top: '10%',
+        left: 0,
+        right: 0,
+        height: 2,
+        zIndex: 10,
+    },
+    scannerLineGlow: {
+        height: '100%',
+        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        shadowColor: '#FFFFFF',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.8,
+        shadowRadius: 10,
+        elevation: 10,
+    },
+    scannerTextContainer: {
+        position: 'absolute',
+        bottom: 100,
+        alignItems: 'center',
+        gap: 12,
+    },
+    scannerText: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#FFFFFF',
+        textAlign: 'center',
+    },
+    scannerSubtext: {
+        fontSize: 14,
+        color: '#CCCCCC',
+        textAlign: 'center',
     },
 });

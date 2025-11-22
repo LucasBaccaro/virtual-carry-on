@@ -6,8 +6,8 @@ import {
     ScrollView,
     TouchableOpacity,
     Image,
-    ActivityIndicator,
     StatusBar,
+    ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -19,188 +19,202 @@ import {
     OutfitRecommendation,
 } from '../../services/fashionRecommendations';
 import { Garment } from '../../services/supabaseService';
-import PageHeader from '../../components/PageHeader';
-import CustomAlert from '../../components/CustomAlert';
+
+// Mock data
+const MOCK_WEATHER = {
+    temp: 23,
+    condition: 'Soleado',
+    icon: 'wb-sunny',
+};
+
+const QUICK_SUGGESTIONS = [
+    { id: '1', emoji: '☀️', text: 'Look para hoy', action: 'today' },
+    { id: '2', emoji: '🎉', text: 'Salida nocturna', action: 'night' },
+    { id: '3', emoji: '💼', text: 'Trabajo', action: 'work' },
+    { id: '4', emoji: '🏃', text: 'Gym', action: 'gym' },
+];
 
 export default function RecommendationsScreen() {
-    const { user } = useAuth();
     const navigation = useNavigation();
-
+    const { user } = useAuth();
+    const [selectedSuggestion, setSelectedSuggestion] = useState<string | null>(null);
     const [recommendations, setRecommendations] = useState<OutfitRecommendation[]>([]);
     const [loading, setLoading] = useState(false);
     const [hasGenerated, setHasGenerated] = useState(false);
-    const [alertVisible, setAlertVisible] = useState(false);
-    const [alertConfig, setAlertConfig] = useState({ title: '', message: '' });
 
-    // Get current date formatted
-    const currentDate = new Date().toLocaleDateString('es-ES', {
-        day: 'numeric',
-        month: 'long',
-    });
+    // Get greeting based on time
+    const getGreeting = () => {
+        const hour = new Date().getHours();
+        if (hour < 12) return 'Buenos días';
+        if (hour < 20) return 'Buenas tardes';
+        return 'Buenas noches';
+    };
 
-    const loadRecommendations = async () => {
+    const loadRecommendations = async (occasion?: string) => {
         if (!user) return;
 
         try {
             setLoading(true);
-            const recs = await getFashionRecommendations(user.id, 3);
+            const recs = await getFashionRecommendations(user.id, 3, occasion);
             setRecommendations(recs);
             setHasGenerated(true);
         } catch (error) {
             console.error('Error loading recommendations:', error);
-            showAlert('Error', 'No se pudieron cargar las recomendaciones');
         } finally {
             setLoading(false);
         }
     };
 
-    const showAlert = (title: string, message: string) => {
-        setAlertConfig({ title, message });
-        setAlertVisible(true);
+    const handleChatWithAssistant = () => {
+        navigation.navigate('FashionAgent' as never);
     };
 
-    const handleAcceptLook = (recommendation: OutfitRecommendation) => {
+    const handleLookPress = (recommendation: OutfitRecommendation) => {
         // Navigate to Wardrobe screen with pre-selected garments
-        navigation.navigate('Wardrobe', {
+        navigation.navigate('Wardrobe' as never, {
             preselectedGarments: recommendation.garments,
             autoGenerate: true,
-        });
+        } as never);
     };
 
-    if (loading) {
-        return (
-            <SafeAreaView style={styles.container} edges={['top']}>
-                <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-                <PageHeader title="Recomendaciones" />
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color="#000" />
-                    <Text style={styles.loadingText}>Analizando tu guardarropa...</Text>
-                    <Text style={styles.loadingSubtext}>
-                        Un diseñador de moda está creando looks perfectos para vos
-                    </Text>
-                </View>
-            </SafeAreaView>
-        );
-    }
-
-    if (!hasGenerated) {
-        return (
-            <SafeAreaView style={styles.container} edges={['top']}>
-                <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-                <PageHeader title="Recomendaciones" />
-                <View style={styles.welcomeContainer}>
-                    <View style={styles.welcomeIconContainer}>
-                        <MaterialIcons name="lightbulb" size={48} color="#000" />
-                    </View>
-                    <Text style={styles.welcomeTitle}>Looks del Día</Text>
-                    <Text style={styles.welcomeDate}>{currentDate}</Text>
-                    <Text style={styles.welcomeText}>
-                        Tengo algunas recomendaciones de outfits para hoy basadas en tu guardarropa.
-                    </Text>
-
-                    <TouchableOpacity
-                        style={styles.generateButton}
-                        onPress={loadRecommendations}
-                    >
-                        <Text style={styles.generateButtonText}>Generar Looks</Text>
-                        <MaterialIcons name="auto-awesome" size={20} color="#FFF" />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.personalizeLink}
-                        onPress={() => navigation.navigate('FashionAgent')}
-                    >
-                        <Text style={styles.personalizeLinkText}>O personalizá tu búsqueda</Text>
-                    </TouchableOpacity>
-                </View>
-            </SafeAreaView>
-        );
-    }
-
-    if (recommendations.length === 0) {
-        return (
-            <SafeAreaView style={styles.container} edges={['top']}>
-                <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-                <PageHeader title="Recomendaciones" />
-                <View style={styles.emptyContainer}>
-                    <MaterialIcons name="checkroom" size={80} color="#CCC" />
-                    <Text style={styles.emptyTitle}>No hay suficientes prendas</Text>
-                    <Text style={styles.emptyText}>
-                        Necesitás al menos una prenda de cada tipo (superior, inferior, calzado) para recibir recomendaciones
-                    </Text>
-                    <TouchableOpacity
-                        style={styles.emptyButton}
-                        onPress={() => navigation.navigate('Closet')}
-                    >
-                        <MaterialIcons name="add" size={24} color="#FFFFFF" />
-                        <Text style={styles.emptyButtonText}>Agregar Prendas</Text>
-                    </TouchableOpacity>
-                </View>
-            </SafeAreaView>
-        );
-    }
+    const handleQuickSuggestion = (action: string) => {
+        setSelectedSuggestion(action);
+        // Load recommendations with the selected occasion
+        loadRecommendations(action);
+    };
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
             <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-            <PageHeader title="Recomendaciones" />
 
-            <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-                <View style={styles.header}>
-                    <Text style={styles.subtitle}>
-                        Un diseñador de moda analizó tu guardarropa y creó estos looks para vos
-                    </Text>
+            <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+            >
+                {/* Hero Section - Greeting & Weather */}
+                <View style={styles.heroSection}>
+                    <View style={styles.greetingContainer}>
+                        <Text style={styles.greeting}>{getGreeting()}! 👋</Text>
+                        <Text style={styles.userName}>Lucas</Text>
+                    </View>
 
-                    <View style={styles.headerActions}>
+                    {/* Weather Card */}
+                    <View style={styles.weatherCard}>
+                        <View style={styles.weatherLeft}>
+                            <MaterialIcons name={MOCK_WEATHER.icon as any} size={40} color="#FFB800" />
+                            <View style={styles.weatherInfo}>
+                                <Text style={styles.weatherTemp}>{MOCK_WEATHER.temp}°</Text>
+                                <Text style={styles.weatherCondition}>{MOCK_WEATHER.condition}</Text>
+                            </View>
+                        </View>
                         <TouchableOpacity
-                            style={styles.actionButton}
-                            onPress={loadRecommendations}
+                            style={styles.weatherAction}
+                            onPress={handleChatWithAssistant}
                         >
-                            <MaterialIcons name="refresh" size={20} color="#000" />
-                            <Text style={styles.actionButtonText}>Regenerar</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[styles.actionButton, styles.primaryAction]}
-                            onPress={() => navigation.navigate('FashionAgent')}
-                        >
-                            <MaterialIcons name="chat" size={20} color="#FFF" />
-                            <Text style={styles.primaryActionText}>Personalizar</Text>
+                            <Text style={styles.weatherActionText}>Charlar con IA</Text>
+                            <MaterialIcons name="chat" size={18} color="#FFF" />
                         </TouchableOpacity>
                     </View>
                 </View>
 
-                {recommendations.map((rec, index) => (
-                    <OutfitRecommendationCard
-                        key={rec.id}
-                        recommendation={rec}
-                        index={index + 1}
-                        onAccept={() => handleAcceptLook(rec)}
-                    />
-                ))}
-            </ScrollView>
+                {/* Quick Suggestions */}
+                <View style={styles.suggestionsSection}>
+                    <Text style={styles.sectionTitle}>¿Qué estás buscando?</Text>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.suggestionsScroll}
+                    >
+                        {QUICK_SUGGESTIONS.map((suggestion) => (
+                            <TouchableOpacity
+                                key={suggestion.id}
+                                style={[
+                                    styles.suggestionChip,
+                                    selectedSuggestion === suggestion.action && styles.suggestionChipActive,
+                                ]}
+                                onPress={() => handleQuickSuggestion(suggestion.action)}
+                            >
+                                <Text style={styles.suggestionEmoji}>{suggestion.emoji}</Text>
+                                <Text style={[
+                                    styles.suggestionText,
+                                    selectedSuggestion === suggestion.action && styles.suggestionTextActive,
+                                ]}>
+                                    {suggestion.text}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
 
-            <CustomAlert
-                visible={alertVisible}
-                title={alertConfig.title}
-                message={alertConfig.message}
-                onClose={() => setAlertVisible(false)}
-            />
+                {/* Looks Section */}
+                <View style={styles.looksSection}>
+                    <View style={styles.looksSectionHeader}>
+                        <Text style={styles.sectionTitle}>Looks Recomendados</Text>
+                        {hasGenerated && (
+                            <TouchableOpacity
+                                style={styles.seeAllButton}
+                                onPress={() => loadRecommendations(selectedSuggestion || undefined)}
+                            >
+                                <MaterialIcons name="refresh" size={18} color="#666" />
+                                <Text style={styles.seeAllText}>Regenerar</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+
+                    {loading ? (
+                        <View style={styles.loadingLooksContainer}>
+                            <ActivityIndicator size="large" color="#000" />
+                            <Text style={styles.loadingLooksText}>Analizando tu guardarropa...</Text>
+                        </View>
+                    ) : !hasGenerated ? (
+                        <View style={styles.emptyLooksContainer}>
+                            <MaterialIcons name="auto-awesome" size={48} color="#CCC" />
+                            <Text style={styles.emptyLooksTitle}>¿Listo para verte increíble?</Text>
+                            <Text style={styles.emptyLooksText}>
+                                Seleccioná una sugerencia arriba o chateá con tu asistente
+                            </Text>
+                        </View>
+                    ) : recommendations.length === 0 ? (
+                        <View style={styles.emptyLooksContainer}>
+                            <MaterialIcons name="checkroom" size={48} color="#CCC" />
+                            <Text style={styles.emptyLooksTitle}>Necesitás más prendas</Text>
+                            <Text style={styles.emptyLooksText}>
+                                Agregá al menos una prenda de cada tipo para recibir recomendaciones
+                            </Text>
+                            <TouchableOpacity
+                                style={styles.emptyLooksButton}
+                                onPress={() => navigation.navigate('Closet' as never)}
+                            >
+                                <MaterialIcons name="add" size={20} color="#FFF" />
+                                <Text style={styles.emptyLooksButtonText}>Agregar Prendas</Text>
+                            </TouchableOpacity>
+                        </View>
+                    ) : (
+                        recommendations.map((rec) => (
+                            <AILookCard
+                                key={rec.id}
+                                recommendation={rec}
+                                onPress={() => handleLookPress(rec)}
+                            />
+                        ))
+                    )}
+                </View>
+            </ScrollView>
         </SafeAreaView>
     );
 }
 
-interface OutfitCardProps {
+interface AILookCardProps {
     recommendation: OutfitRecommendation;
-    index: number;
-    onAccept: () => void;
+    onPress: () => void;
 }
 
-function OutfitRecommendationCard({ recommendation, index, onAccept }: OutfitCardProps) {
+function AILookCard({ recommendation, onPress }: AILookCardProps) {
     const [upperGarment, setUpperGarment] = useState<Garment | null>(null);
     const [lowerGarment, setLowerGarment] = useState<Garment | null>(null);
     const [footwearGarment, setFootwearGarment] = useState<Garment | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [loadingImages, setLoadingImages] = useState(true);
 
     useEffect(() => {
         loadGarmentImages();
@@ -220,219 +234,95 @@ function OutfitRecommendationCard({ recommendation, index, onAccept }: OutfitCar
         } catch (error) {
             console.error('Error loading garment images:', error);
         } finally {
-            setLoading(false);
+            setLoadingImages(false);
         }
     };
 
-    if (loading) {
+    if (loadingImages) {
         return (
-            <View style={styles.card}>
+            <View style={[styles.lookCard, styles.lookCardLoading]}>
                 <ActivityIndicator size="small" color="#000" />
             </View>
         );
     }
 
     return (
-        <View style={styles.card}>
-            {/* Header */}
-            <View style={styles.cardHeader}>
-                <Text style={styles.lookNumber}>Look #{index}</Text>
-                <View style={styles.scoreBadge}>
-                    <MaterialIcons name="star" size={16} color="#FFD700" />
-                    <Text style={styles.score}>{recommendation.score}/10</Text>
-                </View>
+        <TouchableOpacity style={styles.lookCard} onPress={onPress} activeOpacity={0.9}>
+            {/* Images Row */}
+            <View style={styles.lookImagesContainer}>
+                {upperGarment && (
+                    <View style={styles.lookImageWrapper}>
+                        <Image
+                            source={{ uri: upperGarment.image_url }}
+                            style={styles.lookImage}
+                            resizeMode="cover"
+                        />
+                    </View>
+                )}
+                {lowerGarment && (
+                    <View style={styles.lookImageWrapper}>
+                        <Image
+                            source={{ uri: lowerGarment.image_url }}
+                            style={styles.lookImage}
+                            resizeMode="cover"
+                        />
+                    </View>
+                )}
+                {footwearGarment && (
+                    <View style={styles.lookImageWrapper}>
+                        <Image
+                            source={{ uri: footwearGarment.image_url }}
+                            style={styles.lookImage}
+                            resizeMode="cover"
+                        />
+                    </View>
+                )}
             </View>
 
-            {/* Look Name and Description */}
-            <Text style={styles.lookName}>{recommendation.name}</Text>
-            <Text style={styles.description}>{recommendation.description}</Text>
-
-            {/* Garment Grid - 3 images */}
-            <View style={styles.garmentGrid}>
-                <View style={styles.garmentItem}>
-                    {upperGarment && (
-                        <>
-                            <Image
-                                source={{ uri: upperGarment.image_url }}
-                                style={styles.garmentImage}
-                                resizeMode="cover"
-                            />
-                            <Text style={styles.garmentLabel}>{upperGarment.type}</Text>
-                        </>
-                    )}
+            {/* Info */}
+            <View style={styles.lookInfo}>
+                <View style={styles.lookHeader}>
+                    <Text style={styles.lookName}>{recommendation.name}</Text>
+                    <View style={styles.lookScoreBadge}>
+                        <MaterialIcons name="star" size={14} color="#FFD700" />
+                        <Text style={styles.lookScore}>{recommendation.score}/10</Text>
+                    </View>
                 </View>
+                <Text style={styles.lookDescription}>{recommendation.description}</Text>
 
-                <View style={styles.garmentItem}>
-                    {lowerGarment && (
-                        <>
-                            <Image
-                                source={{ uri: lowerGarment.image_url }}
-                                style={styles.garmentImage}
-                                resizeMode="cover"
-                            />
-                            <Text style={styles.garmentLabel}>{lowerGarment.type}</Text>
-                        </>
-                    )}
-                </View>
+                {/* Reasoning */}
+                {recommendation.reasoning && (
+                    <View style={styles.reasoningBox}>
+                        <MaterialIcons name="lightbulb-outline" size={16} color="#666" />
+                        <Text style={styles.reasoningText}>{recommendation.reasoning}</Text>
+                    </View>
+                )}
 
-                <View style={styles.garmentItem}>
-                    {footwearGarment && (
-                        <>
-                            <Image
-                                source={{ uri: footwearGarment.image_url }}
-                                style={styles.garmentImage}
-                                resizeMode="cover"
-                            />
-                            <Text style={styles.garmentLabel}>{footwearGarment.type}</Text>
-                        </>
-                    )}
+                <View style={styles.lookFooter}>
+                    <View style={styles.lookTags}>
+                        <View style={styles.lookTag}>
+                            <Text style={styles.lookTagText}>{recommendation.occasion}</Text>
+                        </View>
+                        {recommendation.season && (
+                            <View style={styles.lookTag}>
+                                <Text style={styles.lookTagText}>{recommendation.season}</Text>
+                            </View>
+                        )}
+                    </View>
+                    <TouchableOpacity style={styles.tryButton} onPress={onPress}>
+                        <Text style={styles.tryButtonText}>Probar</Text>
+                        <MaterialIcons name="arrow-forward" size={16} color="#FFF" />
+                    </TouchableOpacity>
                 </View>
             </View>
-
-            {/* Designer Reasoning */}
-            <View style={styles.reasoningBox}>
-                <MaterialIcons name="lightbulb-outline" size={20} color="#666" />
-                <Text style={styles.reasoning}>{recommendation.reasoning}</Text>
-            </View>
-
-            {/* Tags */}
-            <View style={styles.tags}>
-                <View style={styles.tag}>
-                    <Text style={styles.tagText}>{recommendation.occasion}</Text>
-                </View>
-                <View style={styles.tag}>
-                    <Text style={styles.tagText}>{recommendation.season}</Text>
-                </View>
-            </View>
-
-            {/* Try Button */}
-            <TouchableOpacity style={styles.tryButton} onPress={onAccept}>
-                <Text style={styles.tryButtonText}>Probar este Look</Text>
-                <MaterialIcons name="arrow-forward" size={20} color="#FFF" />
-            </TouchableOpacity>
-        </View>
+        </TouchableOpacity>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: 32,
-    },
-    loadingText: {
-        marginTop: 16,
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#1A1A1A',
-    },
-    loadingSubtext: {
-        marginTop: 8,
-        fontSize: 14,
-        color: '#666',
-        textAlign: 'center',
-    },
-    emptyContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: 32,
-    },
-    emptyTitle: {
-        fontSize: 24,
-        fontWeight: '700',
-        color: '#1A1A1A',
-        marginTop: 24,
-        marginBottom: 8,
-    },
-    emptyText: {
-        fontSize: 16,
-        color: '#666',
-        textAlign: 'center',
-        marginBottom: 32,
-    },
-    emptyButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        backgroundColor: '#000',
-        paddingHorizontal: 24,
-        paddingVertical: 12,
-        borderRadius: 8,
-    },
-    emptyButtonText: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#FFFFFF',
-    },
-    welcomeContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: 32,
-        paddingBottom: 80,
-    },
-    welcomeIconContainer: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: '#F3F4F6',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 24,
-    },
-    welcomeTitle: {
-        fontSize: 28,
-        fontWeight: '800',
-        color: '#1A1A1A',
-        marginBottom: 8,
-    },
-    welcomeDate: {
-        fontSize: 18,
-        color: '#666',
-        fontWeight: '500',
-        marginBottom: 16,
-        textTransform: 'capitalize',
-    },
-    welcomeText: {
-        fontSize: 16,
-        color: '#666',
-        textAlign: 'center',
-        lineHeight: 24,
-        marginBottom: 32,
-    },
-    generateButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        backgroundColor: '#000',
-        paddingHorizontal: 32,
-        paddingVertical: 16,
-        borderRadius: 30,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 4,
-        marginBottom: 24,
-    },
-    generateButtonText: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#FFFFFF',
-    },
-    personalizeLink: {
-        padding: 8,
-    },
-    personalizeLinkText: {
-        fontSize: 14,
-        color: '#666',
-        textDecorationLine: 'underline',
+        backgroundColor: '#FAFAFA',
     },
     scrollView: {
         flex: 1,
@@ -440,53 +330,181 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingBottom: 24,
     },
-    header: {
-        paddingHorizontal: 16,
-        paddingVertical: 16,
-    },
-    subtitle: {
-        fontSize: 16,
-        color: '#666',
-        lineHeight: 22,
-        marginBottom: 16,
-    },
-    headerActions: {
-        flexDirection: 'row',
-        gap: 12,
-    },
-    actionButton: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
+    heroSection: {
         backgroundColor: '#FFFFFF',
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        borderRadius: 8,
+        paddingHorizontal: 20,
+        paddingTop: 16,
+        paddingBottom: 24,
+    },
+    greetingContainer: {
+        marginBottom: 20,
+    },
+    greeting: {
+        fontSize: 28,
+        fontWeight: '800',
+        color: '#1A1A1A',
+        marginBottom: 4,
+    },
+    userName: {
+        fontSize: 18,
+        color: '#666',
+        fontWeight: '500',
+    },
+    weatherCard: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#F9FAFB',
+        borderRadius: 16,
+        padding: 16,
         borderWidth: 1,
         borderColor: '#E5E7EB',
     },
-    actionButtonText: {
+    weatherLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    weatherInfo: {
+        gap: 2,
+    },
+    weatherTemp: {
+        fontSize: 32,
+        fontWeight: '800',
+        color: '#1A1A1A',
+    },
+    weatherCondition: {
+        fontSize: 14,
+        color: '#666',
+        fontWeight: '500',
+    },
+    weatherAction: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: '#000',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 20,
+    },
+    weatherActionText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: '#FFF',
+    },
+    suggestionsSection: {
+        marginTop: 24,
+        marginBottom: 8,
+    },
+    sectionTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#1A1A1A',
+        paddingHorizontal: 20,
+        marginBottom: 12,
+    },
+    suggestionsScroll: {
+        paddingHorizontal: 20,
+        gap: 8,
+    },
+    suggestionChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderRadius: 24,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        marginRight: 8,
+    },
+    suggestionChipActive: {
+        backgroundColor: '#000',
+        borderColor: '#000',
+    },
+    suggestionEmoji: {
+        fontSize: 18,
+    },
+    suggestionText: {
         fontSize: 14,
         fontWeight: '600',
         color: '#1A1A1A',
     },
-    primaryAction: {
-        backgroundColor: '#000',
-        borderWidth: 0,
+    suggestionTextActive: {
+        color: '#FFF',
     },
-    primaryActionText: {
+    looksSection: {
+        marginTop: 24,
+    },
+    looksSectionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        marginBottom: 16,
+    },
+    seeAllButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        padding: 4,
+    },
+    seeAllText: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#FFFFFF',
+        color: '#666',
     },
-    card: {
-        marginHorizontal: 16,
-        marginBottom: 20,
-        padding: 16,
+    loadingLooksContainer: {
+        paddingVertical: 48,
+        alignItems: 'center',
+        gap: 12,
+    },
+    loadingLooksText: {
+        fontSize: 14,
+        color: '#666',
+    },
+    emptyLooksContainer: {
+        paddingVertical: 48,
+        paddingHorizontal: 32,
+        alignItems: 'center',
+        marginHorizontal: 20,
+    },
+    emptyLooksTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1A1A1A',
+        marginTop: 16,
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    emptyLooksText: {
+        fontSize: 14,
+        color: '#666',
+        textAlign: 'center',
+        lineHeight: 20,
+    },
+    emptyLooksButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: '#000',
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderRadius: 24,
+        marginTop: 20,
+    },
+    emptyLooksButtonText: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#FFF',
+    },
+    lookCard: {
         backgroundColor: '#FFFFFF',
-        borderRadius: 12,
+        marginHorizontal: 20,
+        marginBottom: 16,
+        borderRadius: 16,
+        overflow: 'hidden',
         borderWidth: 1,
         borderColor: '#E5E7EB',
         shadowColor: '#000',
@@ -495,19 +513,43 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
         elevation: 2,
     },
-    cardHeader: {
+    lookCardLoading: {
+        minHeight: 200,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    lookImagesContainer: {
+        flexDirection: 'row',
+        backgroundColor: '#F9FAFB',
+        padding: 12,
+        gap: 8,
+    },
+    lookImageWrapper: {
+        flex: 1,
+        aspectRatio: 3 / 4,
+        borderRadius: 8,
+        overflow: 'hidden',
+        backgroundColor: '#E5E7EB',
+    },
+    lookImage: {
+        width: '100%',
+        height: '100%',
+    },
+    lookInfo: {
+        padding: 16,
+    },
+    lookHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 12,
+        marginBottom: 6,
     },
-    lookNumber: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#666',
-        letterSpacing: 0.5,
+    lookName: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1A1A1A',
     },
-    scoreBadge: {
+    lookScoreBadge: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
@@ -516,45 +558,15 @@ const styles = StyleSheet.create({
         paddingVertical: 4,
         borderRadius: 12,
     },
-    score: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: '#1A1A1A',
-    },
-    lookName: {
-        fontSize: 20,
-        fontWeight: '700',
-        color: '#1A1A1A',
-        marginBottom: 4,
-    },
-    description: {
-        fontSize: 14,
-        color: '#666',
-        marginBottom: 16,
-    },
-    garmentGrid: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 16,
-        gap: 12,
-    },
-    garmentItem: {
-        flex: 1,
-        alignItems: 'center',
-    },
-    garmentImage: {
-        width: '100%',
-        aspectRatio: 3 / 4,
-        borderRadius: 8,
-        backgroundColor: '#F5F5F5',
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
-    },
-    garmentLabel: {
-        marginTop: 6,
+    lookScore: {
         fontSize: 12,
+        fontWeight: '700',
+        color: '#1A1A1A',
+    },
+    lookDescription: {
+        fontSize: 14,
         color: '#666',
-        textAlign: 'center',
+        marginBottom: 12,
     },
     reasoningBox: {
         flexDirection: 'row',
@@ -564,41 +576,82 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         marginBottom: 12,
     },
-    reasoning: {
+    reasoningText: {
         flex: 1,
-        fontSize: 14,
+        fontSize: 13,
         color: '#666',
-        lineHeight: 20,
+        lineHeight: 18,
     },
-    tags: {
+    lookFooter: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    lookTags: {
         flexDirection: 'row',
         gap: 8,
-        marginBottom: 16,
     },
-    tag: {
+    lookTag: {
         paddingHorizontal: 12,
         paddingVertical: 6,
         backgroundColor: '#F3F4F6',
         borderRadius: 16,
     },
-    tagText: {
+    lookTagText: {
         fontSize: 12,
         fontWeight: '600',
         color: '#666',
-        textTransform: 'capitalize',
     },
     tryButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
+        gap: 6,
         backgroundColor: '#000',
-        paddingVertical: 14,
-        borderRadius: 8,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 20,
     },
     tryButtonText: {
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: '700',
-        color: '#FFFFFF',
+        color: '#FFF',
+    },
+    ctaCard: {
+        backgroundColor: '#FFFFFF',
+        marginHorizontal: 20,
+        marginTop: 24,
+        padding: 24,
+        borderRadius: 16,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    ctaTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1A1A1A',
+        marginTop: 12,
+        marginBottom: 4,
+        textAlign: 'center',
+    },
+    ctaSubtitle: {
+        fontSize: 14,
+        color: '#666',
+        marginBottom: 16,
+        textAlign: 'center',
+    },
+    ctaButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: '#000',
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        borderRadius: 24,
+    },
+    ctaButtonText: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#FFF',
     },
 });

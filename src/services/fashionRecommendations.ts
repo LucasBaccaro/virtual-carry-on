@@ -36,10 +36,14 @@ interface GeminiRecommendationResponse {
  */
 export async function getFashionRecommendations(
     userId: string,
-    limit: number = 3 // Changed from 5 to 3
+    limit: number = 3,
+    occasion?: string // NEW: Optional occasion parameter
 ): Promise<OutfitRecommendation[]> {
 
     console.log('👔 [getFashionRecommendations] Loading user wardrobe...');
+    if (occasion) {
+        console.log(`🎯 [getFashionRecommendations] Occasion: ${occasion}`);
+    }
 
     // 1. Load ALL user garments with metadata
     const { data: garments, error } = await supabase
@@ -66,8 +70,8 @@ export async function getFashionRecommendations(
         return [];
     }
 
-    // 3. Build prompt for Gemini
-    const prompt = buildFashionDesignerPrompt(uppers, lowers, footwear, limit);
+    // 3. Build prompt for Gemini with occasion
+    const prompt = buildFashionDesignerPrompt(uppers, lowers, footwear, limit, occasion);
 
     // 4. Call Gemini for recommendations
     const recommendations = await callGeminiForRecommendations(
@@ -89,50 +93,74 @@ function buildFashionDesignerPrompt(
     uppers: Garment[],
     lowers: Garment[],
     footwear: Garment[],
-    limit: number
+    limit: number,
+    occasion?: string
 ): string {
 
-    // Serialize garments with metadata
+    // Build detailed garment info with all metadata
     const uppersInfo = uppers.map((g, i) => {
         const meta = g.metadata || {};
-        return `[U${i + 1}] ${g.type}: ${g.description}
-     - Colores: ${meta.colors?.join(', ') || 'desconocido'}
-     - Estilo: ${meta.style || 'desconocido'}
-     - Ocasión: ${meta.occasion?.join(', ') || 'desconocido'}
-     - Temporada: ${meta.season?.join(', ') || 'todo el año'}
-     - Patrón: ${meta.pattern || 'desconocido'}`;
-    }).join('\n\n');
+        return `[U${i + 1}] ${g.type}
+  • Color: ${meta.primaryColor || 'desconocido'}
+  • Estilo: ${meta.style || 'desconocido'}
+  • Ocasión: ${meta.occasion?.join(', ') || 'versátil'}
+  • Temporada: ${meta.season?.join(', ') || 'todo el año'}
+  • Formalidad: ${meta.formality || 'casual'}
+  • Versatilidad: ${meta.versatility || 5}/10`;
+    }).join('\n');
 
     const lowersInfo = lowers.map((g, i) => {
         const meta = g.metadata || {};
-        return `[L${i + 1}] ${g.type}: ${g.description}
-     - Colores: ${meta.colors?.join(', ') || 'desconocido'}
-     - Estilo: ${meta.style || 'desconocido'}
-     - Ocasión: ${meta.occasion?.join(', ') || 'desconocido'}
-     - Temporada: ${meta.season?.join(', ') || 'todo el año'}
-     - Patrón: ${meta.pattern || 'desconocido'}`;
-    }).join('\n\n');
+        return `[L${i + 1}] ${g.type}
+  • Color: ${meta.primaryColor || 'desconocido'}
+  • Estilo: ${meta.style || 'desconocido'}
+  • Ocasión: ${meta.occasion?.join(', ') || 'versátil'}
+  • Temporada: ${meta.season?.join(', ') || 'todo el año'}
+  • Formalidad: ${meta.formality || 'casual'}`;
+    }).join('\n');
 
     const footwearInfo = footwear.map((g, i) => {
         const meta = g.metadata || {};
-        return `[F${i + 1}] ${g.type}: ${g.description}
-     - Colores: ${meta.colors?.join(', ') || 'desconocido'}
-     - Estilo: ${meta.style || 'desconocido'}
-     - Ocasión: ${meta.occasion?.join(', ') || 'desconocido'}`;
-    }).join('\n\n');
+        return `[F${i + 1}] ${g.type}
+  • Color: ${meta.primaryColor || 'desconocido'}
+  • Estilo: ${meta.style || 'desconocido'}
+  • Ocasión: ${meta.occasion?.join(', ') || 'versátil'}`;
+    }).join('\n');
 
-    // Ultra-simplified prompt to minimize thinking mode
-    return `Recomienda ${limit} outfits DIFERENTES combinando estas prendas:
+    // Build occasion-specific instructions
+    let occasionInstruction = '';
+    if (occasion) {
+        const occasionMap: Record<string, string> = {
+            'today': 'para usar HOY (clima actual, casual y cómodo)',
+            'night': 'para SALIDA NOCTURNA (elegante, moderno, impactante)',
+            'work': 'para TRABAJO/OFICINA (profesional, formal, apropiado)',
+            'gym': 'para GIMNASIO/DEPORTE (cómodo, deportivo, funcional)',
+        };
+        occasionInstruction = `\n🎯 CONTEXTO ESPECÍFICO: El usuario necesita un outfit ${occasionMap[occasion] || occasion}.`;
+    }
 
-SUPERIORES: ${uppers.map((g, i) => `[U${i + 1}] ${g.type} ${g.metadata?.primaryColor || ''}`).join(', ')}
-INFERIORES: ${lowers.map((g, i) => `[L${i + 1}] ${g.type} ${g.metadata?.primaryColor || ''}`).join(', ')}
-CALZADO: ${footwear.map((g, i) => `[F${i + 1}] ${g.type} ${g.metadata?.primaryColor || ''}`).join(', ')}
+    return `Sos un diseñador de moda experto. Analizá estas prendas del guardarropa del usuario y recomendá ${limit} outfits DIFERENTES.${occasionInstruction}
 
-IMPORTANTE: Cada outfit debe usar DIFERENTES combinaciones de prendas. NO repitas la misma combinación.
-Genera EXACTAMENTE ${limit} recomendaciones.
+📋 PRENDAS DISPONIBLES:
 
-Responde SOLO con JSON:
-[{"name":"Look Casual","description":"Para el día","upperRef":"U1","lowerRef":"L1","footwearRef":"F1","reasoning":"Combina bien","score":8,"occasion":"diario","season":"primavera"}]`;
+SUPERIORES:
+${uppersInfo}
+
+INFERIORES:
+${lowersInfo}
+
+CALZADO:
+${footwearInfo}
+
+✨ INSTRUCCIONES:
+1. Crea ${limit} combinaciones DIFERENTES (no repitas prendas entre outfits)
+2. ${occasion ? `Priorizá prendas apropiadas para: ${occasion}` : 'Combiná prendas que funcionen bien juntas'}
+3. Considerá colores, estilos y formalidad para que combinen
+4. Asigná un score (1-10) según qué tan bien funciona el outfit
+5. Explicá brevemente por qué elegiste esa combinación
+
+Responde SOLO con JSON (sin markdown):
+[{"name":"Look Casual Urbano","description":"Perfecto para el día","upperRef":"U1","lowerRef":"L2","footwearRef":"F1","reasoning":"Colores neutros que combinan bien, estilo relajado y cómodo","score":8,"occasion":"casual","season":"primavera"}]`;
 }
 
 /**

@@ -9,7 +9,6 @@ import { useUserPhoto } from '../../context/UserPhotoContext';
 import { useAuth } from '../../context/AuthContext';
 import { getGarments, Garment } from '../../services/supabaseService';
 import CustomAlert from '../../components/CustomAlert';
-import ModelSelector from '../../components/ModelSelector';
 import PageHeader from '../../components/PageHeader';
 import { generateTryOnImage } from '../../services/gemini';
 
@@ -39,7 +38,6 @@ export default function WardrobeScreen({ route }: any) {
     const [isGenerating, setIsGenerating] = useState(false);
     const [loadingStep, setLoadingStep] = useState<string>(''); // 'analyzing', 'lighting', 'generating'
     const [generatedImageBase64, setGeneratedImageBase64] = useState<string | null>(null);
-    const [selectedModel, setSelectedModel] = useState<'gemini-3-pro' | 'gemini-2.5-flash'>('gemini-3-pro');
     const [categoryModalVisible, setCategoryModalVisible] = useState(false);
     const [isComparing, setIsComparing] = useState(false);
 
@@ -195,7 +193,7 @@ export default function WardrobeScreen({ route }: any) {
                     type: onePieceItem.type,
                     description: onePieceItem.description
                 } : undefined,
-                modelVersion: selectedModel
+                modelVersion: 'gemini-3-pro'
             });
 
             if (result.success && result.imageBase64) {
@@ -241,7 +239,7 @@ export default function WardrobeScreen({ route }: any) {
 
             await saveOutfit({
                 imageBase64: generatedImageBase64,
-                modelUsed: selectedModel,
+                modelUsed: 'gemini-3-pro',
                 categoryId,
                 garmentIds,
             });
@@ -363,11 +361,6 @@ export default function WardrobeScreen({ route }: any) {
             <PageHeader title="Crear Outfit" />
 
             <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-                {/* Model Selection */}
-                <View style={styles.modelSelectionContainer}>
-                    <ModelSelector selectedModel={selectedModel} onSelectModel={setSelectedModel} />
-                </View>
-
                 {/* Main Preview Area */}
                 <View style={styles.previewContainer}>
                     <TouchableOpacity
@@ -600,14 +593,10 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingBottom: 100, // Space for bottom bar
     },
-    modelSelectionContainer: {
-        paddingHorizontal: 16,
-        paddingTop: 12,
-        paddingBottom: 0,
-    },
     previewContainer: {
         paddingHorizontal: 16,
         marginBottom: 24,
+        marginTop: 12,
     },
     previewCard: {
         position: 'relative',
