@@ -3,7 +3,7 @@ import { User, Garment } from '../types';
 export const mockUser: User = {
     id: '1',
     name: 'Usuario Demo',
-    image: require('../../assets/images/cuerpo1.jpeg'),
+    image: require('../../assets/images/cuerpo1.jpg'),
 };
 
 export const mockGarments: Garment[] = [

@@ -29,19 +29,19 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const onboardingData = [
     {
         id: 1,
-        image: require('../../../assets/images/onboarding-1.png'),
+        image: require('../../../assets/images/onboarding-1.jpg'),
         title: 'Tu Guardarropa Virtual',
         description: 'Digitaliza todas tus prendas y accede a tu closet desde cualquier lugar',
     },
     {
         id: 2,
-        image: require('../../../assets/images/onboarding-2.png'),
+        image: require('../../../assets/images/onboarding-2.jpg'),
         title: 'Prueba con IA',
         description: 'Visualiza cómo te quedan diferentes outfits antes de vestirte',
     },
     {
         id: 3,
-        image: require('../../../assets/images/onboarding-3.png'),
+        image: require('../../../assets/images/onboarding-3.jpg'),
         title: 'Organiza y Guarda',
         description: 'Crea categorías personalizadas y guarda tus combinaciones favoritas',
     },
