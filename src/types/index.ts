@@ -1,4 +1,4 @@
-export type GarmentType = 'upper' | 'lower' | 'footwear';
+export type GarmentType = 'upper' | 'lower' | 'footwear' | 'one-piece';
 
 export type GarmentFit = 'tight' | 'slim' | 'regular' | 'loose' | 'oversize';
 

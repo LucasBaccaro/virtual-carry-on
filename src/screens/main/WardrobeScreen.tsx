@@ -10,6 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 import { getGarments, Garment } from '../../services/supabaseService';
 import CustomAlert from '../../components/CustomAlert';
 import ModelSelector from '../../components/ModelSelector';
+import PageHeader from '../../components/PageHeader';
 import { generateTryOnImage } from '../../services/gemini';
 
 export default function WardrobeScreen() {
@@ -22,12 +23,14 @@ export default function WardrobeScreen() {
     const [upperGarments, setUpperGarments] = useState<Garment[]>([]);
     const [lowerGarments, setLowerGarments] = useState<Garment[]>([]);
     const [footwearGarments, setFootwearGarments] = useState<Garment[]>([]);
+    const [onePieceGarments, setOnePieceGarments] = useState<Garment[]>([]);
     const [isLoadingGarments, setIsLoadingGarments] = useState(true);
 
     // Selection state
     const [selectedUpper, setSelectedUpper] = useState<string | null>(null);
     const [selectedLower, setSelectedLower] = useState<string | null>(null);
     const [selectedFootwear, setSelectedFootwear] = useState<string | null>(null);
+    const [selectedOnePiece, setSelectedOnePiece] = useState<string | null>(null);
 
     // Generation state
     const [isGenerating, setIsGenerating] = useState(false);
@@ -60,10 +63,11 @@ export default function WardrobeScreen() {
 
         try {
             setIsLoadingGarments(true);
-            const [upperResult, lowerResult, footwearResult] = await Promise.all([
+            const [upperResult, lowerResult, footwearResult, onePieceResult] = await Promise.all([
                 getGarments(user.id, 'upper'),
                 getGarments(user.id, 'lower'),
                 getGarments(user.id, 'footwear'),
+                getGarments(user.id, 'one-piece'),
             ]);
 
             if (upperResult.data) {
@@ -89,6 +93,12 @@ export default function WardrobeScreen() {
             } else {
                 setFootwearGarments([]);
             }
+            if (onePieceResult.data) {
+                console.log(`✅ [WardrobeScreen] Cuerpo Completo: ${onePieceResult.data.length} prendas`);
+                setOnePieceGarments(onePieceResult.data || []);
+            } else {
+                setOnePieceGarments([]);
+            }
         } catch (error) {
             console.error('❌ [WardrobeScreen] Error loading garments:', error);
             showAlert('Error', 'No se pudieron cargar las prendas');
@@ -98,7 +108,7 @@ export default function WardrobeScreen() {
     };
 
     const handleTryOn = async () => {
-        if (!selectedUpper && !selectedLower && !selectedFootwear) {
+        if (!selectedUpper && !selectedLower && !selectedFootwear && !selectedOnePiece) {
             showAlert('Selección incompleta', 'Por favor selecciona al menos una prenda.');
             return;
         }
@@ -113,6 +123,7 @@ export default function WardrobeScreen() {
             const upperItem = upperGarments.find(i => i.id === selectedUpper);
             const lowerItem = lowerGarments.find(i => i.id === selectedLower);
             const footwearItem = footwearGarments.find(i => i.id === selectedFootwear);
+            const onePieceItem = onePieceGarments.find(i => i.id === selectedOnePiece);
 
             const result = await generateTryOnImage({
                 userImage: userPhotoUri,
@@ -130,6 +141,11 @@ export default function WardrobeScreen() {
                     image: footwearItem.image_url,
                     type: footwearItem.type,
                     description: footwearItem.description
+                } : undefined,
+                onePiece: onePieceItem ? {
+                    image: onePieceItem.image_url,
+                    type: onePieceItem.type,
+                    description: onePieceItem.description
                 } : undefined,
                 modelVersion: selectedModel
             });
@@ -151,6 +167,7 @@ export default function WardrobeScreen() {
         setSelectedUpper(null);
         setSelectedLower(null);
         setSelectedFootwear(null);
+        setSelectedOnePiece(null);
         setIsComparing(false);
     };
 
@@ -165,8 +182,12 @@ export default function WardrobeScreen() {
 
         try {
             const garmentIds: string[] = [];
-            if (selectedUpper) garmentIds.push(selectedUpper);
-            if (selectedLower) garmentIds.push(selectedLower);
+            if (selectedOnePiece) {
+                garmentIds.push(selectedOnePiece);
+            } else {
+                if (selectedUpper) garmentIds.push(selectedUpper);
+                if (selectedLower) garmentIds.push(selectedLower);
+            }
             if (selectedFootwear) garmentIds.push(selectedFootwear);
 
             await saveOutfit({
@@ -237,7 +258,7 @@ export default function WardrobeScreen() {
         );
     }
 
-    const totalGarments = upperGarments.length + lowerGarments.length + footwearGarments.length;
+    const totalGarments = upperGarments.length + lowerGarments.length + footwearGarments.length + onePieceGarments.length;
 
     if (totalGarments === 0) {
         return (
@@ -265,9 +286,7 @@ export default function WardrobeScreen() {
         return (
             <SafeAreaView style={styles.container} edges={['top']}>
                 <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-                <View style={styles.header}>
-                    <Text style={styles.headerTitle}>Crear Outfit</Text>
-                </View>
+                <PageHeader title="Crear Outfit" />
                 <View style={styles.emptyStateContainer}>
                     <MaterialIcons name="person-outline" size={80} color="#CCC" />
                     <Text style={styles.emptyStateTitle}>Subí tu foto de perfil</Text>
@@ -291,9 +310,7 @@ export default function WardrobeScreen() {
             <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
             {/* Header */}
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>Crear Outfit</Text>
-            </View>
+            <PageHeader title="Crear Outfit" />
 
             <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
                 {/* Model Selection */}
@@ -348,8 +365,28 @@ export default function WardrobeScreen() {
                 </View>
 
                 {/* Garment Sections */}
-                {renderGarmentSection('Parte Superior', upperGarments, selectedUpper, setSelectedUpper)}
-                {renderGarmentSection('Parte Inferior', lowerGarments, selectedLower, setSelectedLower)}
+                {renderGarmentSection('Cuerpo Completo', onePieceGarments, selectedOnePiece, (id) => {
+                    setSelectedOnePiece(id === selectedOnePiece ? null : id);
+                    if (id !== selectedOnePiece) {
+                        setSelectedUpper(null);
+                        setSelectedLower(null);
+                    }
+                })}
+
+                {renderGarmentSection('Parte Superior', upperGarments, selectedUpper, (id) => {
+                    setSelectedUpper(id === selectedUpper ? null : id);
+                    if (id !== selectedUpper) {
+                        setSelectedOnePiece(null);
+                    }
+                })}
+
+                {renderGarmentSection('Parte Inferior', lowerGarments, selectedLower, (id) => {
+                    setSelectedLower(id === selectedLower ? null : id);
+                    if (id !== selectedLower) {
+                        setSelectedOnePiece(null);
+                    }
+                })}
+
                 {renderGarmentSection('Calzado', footwearGarments, selectedFootwear, setSelectedFootwear)}
 
             </ScrollView>
@@ -482,20 +519,6 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '700',
         color: '#FFFFFF',
-    },
-    header: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#EFEFEF',
-        backgroundColor: '#FFFFFF',
-    },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#1A1A1A',
     },
     scrollView: {
         flex: 1,

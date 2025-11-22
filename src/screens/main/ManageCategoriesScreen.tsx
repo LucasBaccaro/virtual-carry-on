@@ -6,8 +6,13 @@ import { useNavigation } from '@react-navigation/native';
 import { useOutfits } from '../../context/OutfitContext';
 import { colors, typography, spacing, borderRadius } from '../../constants/theme';
 import CustomAlert from '../../components/CustomAlert';
+import PageHeader from '../../components/PageHeader';
 
-export default function ManageCategoriesScreen() {
+interface ManageCategoriesScreenProps {
+    hideHeader?: boolean;
+}
+
+export default function ManageCategoriesScreen({ hideHeader = false }: ManageCategoriesScreenProps) {
     const navigation = useNavigation();
     const { categories, addCategory, removeCategory, updateCategory } = useOutfits();
 
@@ -71,14 +76,10 @@ export default function ManageCategoriesScreen() {
         setEditingCategory(null);
     };
 
-    return (
-        <SafeAreaView style={styles.container} edges={['top']}>
-            {/* Header */}
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>Categorías</Text>
-            </View>
+    const content = (
+        <>
 
-            {/* List */}
+
             <ScrollView style={styles.content}>
                 {categories.map((category, index) => (
                     <View key={`manage-category-${category.id}-${index}`} style={styles.listItem}>
@@ -106,51 +107,50 @@ export default function ManageCategoriesScreen() {
                 ))}
             </ScrollView>
 
-            {/* Footer */}
-            <View style={styles.footer}>
-                <TouchableOpacity style={styles.addButton} onPress={handleAddPress}>
-                    <Text style={styles.addButtonText}>Nueva Categoría</Text>
-                </TouchableOpacity>
-            </View>
+            {/* FAB Add Category */}
+            <TouchableOpacity style={styles.fab} onPress={handleAddPress}>
+                <MaterialIcons name="add" size={32} color="#FFFFFF" />
+            </TouchableOpacity>
 
-            {/* Add/Edit Modal */}
             <Modal
                 animationType="fade"
                 transparent={true}
                 visible={modalVisible}
                 onRequestClose={() => setModalVisible(false)}
             >
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === "ios" ? "padding" : "height"}
-                    style={styles.modalOverlay}
-                >
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>
-                            {editingCategory ? 'Editar Categoría' : 'Nueva Categoría'}
-                        </Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Nombre de la categoría"
-                            value={categoryName}
-                            onChangeText={setCategoryName}
-                            autoFocus
-                        />
-                        <View style={styles.modalButtons}>
-                            <TouchableOpacity
-                                style={[styles.modalButton, styles.cancelButton]}
-                                onPress={() => setModalVisible(false)}
-                            >
-                                <Text style={styles.cancelButtonText}>Cancelar</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[styles.modalButton, styles.saveButton]}
-                                onPress={handleSave}
-                            >
-                                <Text style={styles.saveButtonText}>Guardar</Text>
-                            </TouchableOpacity>
+                <View style={styles.modalOverlay}>
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === "ios" ? "padding" : "height"}
+                        style={styles.keyboardAvoidingView}
+                    >
+                        <View style={styles.modalContent}>
+                            <Text style={styles.modalTitle}>
+                                {editingCategory ? 'Editar Categoría' : 'Nueva Categoría'}
+                            </Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Nombre de la categoría"
+                                value={categoryName}
+                                onChangeText={setCategoryName}
+                                autoFocus
+                            />
+                            <View style={styles.modalButtons}>
+                                <TouchableOpacity
+                                    style={[styles.modalButton, styles.cancelButton]}
+                                    onPress={() => setModalVisible(false)}
+                                >
+                                    <Text style={styles.cancelButtonText}>Cancelar</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.modalButton, styles.saveButton]}
+                                    onPress={handleSave}
+                                >
+                                    <Text style={styles.saveButtonText}>Guardar</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
-                    </View>
-                </KeyboardAvoidingView>
+                    </KeyboardAvoidingView>
+                </View>
             </Modal>
 
             {/* Custom Alert */}
@@ -161,6 +161,20 @@ export default function ManageCategoriesScreen() {
                 buttons={alertConfig.buttons}
                 onClose={() => setAlertVisible(false)}
             />
+        </>
+    );
+
+    if (hideHeader) {
+        return <View style={styles.container}>{content}</View>;
+    }
+
+    return (
+        <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+            {/* Header */}
+            {!hideHeader && (
+                <PageHeader title="Categorías" showBackButton />
+            )}
+            {content}
         </SafeAreaView>
     );
 }
@@ -174,8 +188,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         padding: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#EFEFEF',
     },
     headerTitle: {
         fontSize: 18,
@@ -227,36 +239,42 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         backgroundColor: '#FFFFFF', // hover:bg-zinc-100 logic handled by TouchableOpacity opacity
     },
-    footer: {
-        padding: 16,
-        borderTopWidth: 1,
-        borderTopColor: '#EFEFEF',
-        backgroundColor: '#FFFFFF',
-    },
-    addButton: {
-        height: 48,
-        backgroundColor: '#1A1A1A',
-        borderRadius: 8,
-        justifyContent: 'center',
+    fab: {
+        position: 'absolute',
+        bottom: spacing.xl,
+        right: spacing.lg,
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: '#000000',
         alignItems: 'center',
-    },
-    addButtonText: {
-        color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: '600',
+        justifyContent: 'center',
+        zIndex: 999,
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        elevation: 5,
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
         justifyContent: 'center',
         alignItems: 'center',
-        padding: 20,
+        padding: spacing.lg,
+    },
+    keyboardAvoidingView: {
+        width: '100%',
+        alignItems: 'center',
     },
     modalContent: {
+        width: '100%',
         backgroundColor: '#FFFFFF',
         borderRadius: 16,
-        padding: 24,
-        width: '100%',
+        padding: spacing.lg,
         maxWidth: 340,
         shadowColor: "#000",
         shadowOffset: {

@@ -17,11 +17,16 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../context/AuthContext';
 import { createGarment, getGarments, deleteGarment, Garment } from '../../services/supabaseService';
 import CustomAlert from '../../components/CustomAlert';
-import { colors, typography, spacing } from '../../constants/theme';
+import CustomDeleteDialog from '../../components/CustomDeleteDialog';
+import { colors, spacing, borderRadius, typography } from '../../constants/theme';
 
-type GarmentCategory = 'upper' | 'lower' | 'footwear';
+type GarmentCategory = 'upper' | 'lower' | 'footwear' | 'one-piece';
 
-export default function WardrobeManagementScreen() {
+interface WardrobeManagementScreenProps {
+    hideHeader?: boolean;
+}
+
+export default function WardrobeManagementScreen({ hideHeader = false }: WardrobeManagementScreenProps) {
     const navigation = useNavigation();
     const { user } = useAuth();
     const [selectedTab, setSelectedTab] = useState<GarmentCategory>('upper');
@@ -114,6 +119,7 @@ export default function WardrobeManagementScreen() {
                     upper: 'Camisa',
                     lower: 'Pantalón',
                     footwear: 'Zapatillas',
+                    'one-piece': 'Cuerpo Completo',
                 };
 
                 const garmentType = typeMap[selectedTab];
@@ -193,42 +199,56 @@ export default function WardrobeManagementScreen() {
 
     const filteredGarments = garments.filter((g) => g.category === selectedTab);
 
-    return (
-        <SafeAreaView style={styles.container} edges={['top']}>
+    const content = (
+        <>
             <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-            {/* Header */}
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>Mi Guardarropa</Text>
-            </View>
+            {!hideHeader && (
+                <View style={styles.header}>
+                    <Text style={styles.headerTitle}>Gestionar Prendas</Text>
+                </View>
+            )}
 
             {/* Tabs */}
-            <View style={styles.tabsContainer}>
-                <TouchableOpacity
-                    style={[styles.tab, selectedTab === 'upper' && styles.activeTab]}
-                    onPress={() => setSelectedTab('upper')}
+            <View style={styles.tabsWrapper}>
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.tabsContainer}
                 >
-                    <MaterialIcons name="checkroom" size={24} color={selectedTab === 'upper' ? '#000' : '#999'} />
-                    <Text style={[styles.tabText, selectedTab === 'upper' && styles.activeTabText]}>
-                        Parte Superior
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.tab, selectedTab === 'lower' && styles.activeTab]}
-                    onPress={() => setSelectedTab('lower')}
-                >
-                    <MaterialIcons name="checkroom" size={24} color={selectedTab === 'lower' ? '#000' : '#999'} />
-                    <Text style={[styles.tabText, selectedTab === 'lower' && styles.activeTabText]}>
-                        Parte Inferior
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.tab, selectedTab === 'footwear' && styles.activeTab]}
-                    onPress={() => setSelectedTab('footwear')}
-                >
-                    <MaterialIcons name="directions-walk" size={24} color={selectedTab === 'footwear' ? '#000' : '#999'} />
-                    <Text style={[styles.tabText, selectedTab === 'footwear' && styles.activeTabText]}>Calzado</Text>
-                </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.tab, selectedTab === 'upper' && styles.activeTab]}
+                        onPress={() => setSelectedTab('upper')}
+                    >
+                        <MaterialIcons name="checkroom" size={24} color={selectedTab === 'upper' ? '#000' : '#999'} />
+                        <Text style={[styles.tabText, selectedTab === 'upper' && styles.activeTabText]}>
+                            Parte Superior
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.tab, selectedTab === 'lower' && styles.activeTab]}
+                        onPress={() => setSelectedTab('lower')}
+                    >
+                        <MaterialIcons name="checkroom" size={24} color={selectedTab === 'lower' ? '#000' : '#999'} />
+                        <Text style={[styles.tabText, selectedTab === 'lower' && styles.activeTabText]}>
+                            Parte Inferior
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.tab, selectedTab === 'footwear' && styles.activeTab]}
+                        onPress={() => setSelectedTab('footwear')}
+                    >
+                        <MaterialIcons name="directions-walk" size={24} color={selectedTab === 'footwear' ? '#000' : '#999'} />
+                        <Text style={[styles.tabText, selectedTab === 'footwear' && styles.activeTabText]}>Calzado</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.tab, selectedTab === 'one-piece' && styles.activeTab]}
+                        onPress={() => setSelectedTab('one-piece')}
+                    >
+                        <MaterialIcons name="accessibility-new" size={24} color={selectedTab === 'one-piece' ? '#000' : '#999'} />
+                        <Text style={[styles.tabText, selectedTab === 'one-piece' && styles.activeTabText]}>Cuerpo Completo</Text>
+                    </TouchableOpacity>
+                </ScrollView>
             </View>
 
             {/* Content */}
@@ -260,23 +280,20 @@ export default function WardrobeManagementScreen() {
                 )}
             </ScrollView>
 
-            {/* Upload Button */}
-            <View style={styles.footer}>
-                <TouchableOpacity
-                    style={[styles.uploadButton, isUploading && styles.uploadButtonDisabled]}
-                    onPress={handleUpload}
-                    disabled={isUploading}
-                >
-                    {isUploading ? (
-                        <ActivityIndicator color="#FFFFFF" />
-                    ) : (
-                        <>
-                            <MaterialIcons name="add-photo-alternate" size={24} color="#FFFFFF" />
-                            <Text style={styles.uploadButtonText}>Subir Prenda</Text>
-                        </>
-                    )}
-                </TouchableOpacity>
-            </View>
+
+
+            {/* FAB Upload Button */}
+            <TouchableOpacity
+                style={[styles.fab, isUploading && styles.fabDisabled]}
+                onPress={handleUpload}
+                disabled={isUploading}
+            >
+                {isUploading ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                    <MaterialIcons name="add" size={32} color="#FFFFFF" />
+                )}
+            </TouchableOpacity>
 
             {/* Custom Alert */}
             <CustomAlert
@@ -286,6 +303,16 @@ export default function WardrobeManagementScreen() {
                 buttons={alertConfig.buttons}
                 onClose={() => setAlertVisible(false)}
             />
+        </>
+    );
+
+    if (hideHeader) {
+        return <View style={styles.container}>{content}</View>;
+    }
+
+    return (
+        <SafeAreaView style={styles.container} edges={['top']}>
+            {content}
         </SafeAreaView>
     );
 }
@@ -300,26 +327,28 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         paddingHorizontal: 16,
         paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#EFEFEF',
     },
     headerTitle: {
         fontSize: 18,
         fontWeight: '700',
         color: '#1A1A1A',
     },
-    tabsContainer: {
-        flexDirection: 'row',
+    tabsWrapper: {
         borderBottomWidth: 1,
         borderBottomColor: '#EFEFEF',
         backgroundColor: '#FFFFFF',
     },
+    tabsContainer: {
+        flexDirection: 'row',
+        paddingHorizontal: 8,
+    },
     tab: {
-        flex: 1,
         flexDirection: 'column',
         alignItems: 'center',
         paddingVertical: 12,
+        paddingHorizontal: 16,
         gap: 4,
+        minWidth: 100,
     },
     activeTab: {
         borderBottomWidth: 2,
@@ -392,27 +421,27 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    footer: {
-        padding: 16,
-        borderTopWidth: 1,
-        borderTopColor: '#EFEFEF',
-        backgroundColor: '#FFFFFF',
-    },
-    uploadButton: {
-        flexDirection: 'row',
+    fab: {
+        position: 'absolute',
+        bottom: spacing.xl,
+        right: spacing.lg,
+        width: 56,
         height: 56,
-        backgroundColor: '#000',
-        borderRadius: 8,
+        borderRadius: 28,
+        backgroundColor: '#000000',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 8,
+        zIndex: 999,
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        elevation: 5,
     },
-    uploadButtonDisabled: {
-        opacity: 0.6,
-    },
-    uploadButtonText: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#FFFFFF',
+    fabDisabled: {
+        opacity: 0.7,
     },
 });

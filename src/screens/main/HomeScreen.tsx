@@ -1,30 +1,58 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, StatusBar, Image, TouchableOpacity, Dimensions, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Swiper from 'react-native-deck-swiper';
 import { MaterialIcons } from '@expo/vector-icons';
 import ImageViewing from 'react-native-image-viewing';
 import { colors, typography, spacing, borderRadius } from '../../constants/theme';
 import { useOutfits } from '../../context/OutfitContext';
 import CustomAlert from '../../components/CustomAlert';
-import { Outfit } from '../../types';
+import PageHeader from '../../components/PageHeader';
+
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH * 0.9;
-const CARD_HEIGHT = SCREEN_HEIGHT * 0.62;
+const CARD_HEIGHT = SCREEN_HEIGHT * 0.5;
+
+interface CategorySection {
+    categoryId: string;
+    categoryName: string;
+    outfits: any[];
+}
 
 export default function HomeScreen() {
     const { savedOutfits, removeOutfit, categories } = useOutfits();
-    const [currentIndex, setCurrentIndex] = useState(0);
     const [alertVisible, setAlertVisible] = useState(false);
-    const [outfitToDelete, setOutfitToDelete] = useState<string | null>(null);
-    const [selectedCategory, setSelectedCategory] = useState<string>('all');
+    const [outfitToDelete, setOutfitToDelete] = useState<{ id: string; imageUrl: string } | null>(null);
     const [imageModalVisible, setImageModalVisible] = useState(false);
     const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
-    const swiperRef = React.useRef<Swiper<any>>(null);
 
-    const filteredOutfits = selectedCategory === 'all'
-        ? savedOutfits
-        : savedOutfits.filter(outfit => outfit.categoryId === selectedCategory);
+    // Agrupar outfits por categoría
+    const categorySections: CategorySection[] = React.useMemo(() => {
+        // Primero, crear sección "Sin categoría" para outfits sin categoryId
+        const uncategorizedOutfits = savedOutfits.filter(outfit => !outfit.categoryId);
+        const sections: CategorySection[] = [];
+
+        if (uncategorizedOutfits.length > 0) {
+            sections.push({
+                categoryId: 'uncategorized',
+                categoryName: 'Sin Categoría',
+                outfits: uncategorizedOutfits,
+            });
+        }
+
+        // Luego, crear una sección por cada categoría que tenga outfits
+        categories.forEach(category => {
+            const categoryOutfits = savedOutfits.filter(outfit => outfit.categoryId === category.id);
+            if (categoryOutfits.length > 0) {
+                sections.push({
+                    categoryId: category.id,
+                    categoryName: category.name,
+                    outfits: categoryOutfits,
+                });
+            }
+        });
+
+        return sections;
+    }, [savedOutfits, categories]);
 
     const formatDate = (timestamp: string) => {
         const date = new Date(timestamp);
@@ -35,18 +63,15 @@ export default function HomeScreen() {
         });
     };
 
-    const confirmDelete = (outfitId: string) => {
-        setOutfitToDelete(outfitId);
+    const confirmDelete = (outfitId: string, imageUrl: string) => {
+        setOutfitToDelete({ id: outfitId, imageUrl });
         setAlertVisible(true);
     };
 
     const handleDelete = async () => {
         if (outfitToDelete) {
             try {
-                const outfit = savedOutfits.find(o => o.id === outfitToDelete);
-                if (outfit) {
-                    await removeOutfit(outfitToDelete, outfit.imageUrl);
-                }
+                await removeOutfit(outfitToDelete.id, outfitToDelete.imageUrl);
             } catch (error) {
                 console.error('Error deleting outfit:', error);
             } finally {
@@ -56,14 +81,6 @@ export default function HomeScreen() {
         }
     };
 
-    useEffect(() => {
-        setCurrentIndex(0);
-        // Reset swiper to first card when category changes
-        if (swiperRef.current) {
-            swiperRef.current.jumpToCardIndex(0);
-        }
-    }, [selectedCategory]);
-
     const handleImagePress = (imageUrl: string) => {
         setSelectedImageUrl(imageUrl);
         setImageModalVisible(true);
@@ -71,7 +88,6 @@ export default function HomeScreen() {
 
     const handleCloseImageViewer = () => {
         setImageModalVisible(false);
-        // Limpiar el estado después de cerrar para evitar problemas
         setTimeout(() => {
             setSelectedImageUrl(null);
         }, 300);
@@ -79,11 +95,11 @@ export default function HomeScreen() {
 
     const images = selectedImageUrl ? [{ uri: selectedImageUrl }] : [];
 
-    const renderCard = (outfit: typeof savedOutfits[0], index: number) => {
+    const renderCard = (outfit: any, index: number, totalInCategory: number) => {
         if (!outfit) return null;
 
         return (
-            <View key={`card-${outfit.id}-${index}`} style={styles.card}>
+            <View style={styles.card}>
                 <TouchableOpacity
                     activeOpacity={0.9}
                     onPress={() => handleImagePress(outfit.imageUrl)}
@@ -99,14 +115,14 @@ export default function HomeScreen() {
                 {/* Counter Badge */}
                 <View style={styles.counterBadge}>
                     <Text style={styles.counterText}>
-                        {index + 1}/{filteredOutfits.length}
+                        {index + 1}/{totalInCategory}
                     </Text>
                 </View>
 
                 {/* Delete Button */}
                 <TouchableOpacity
                     style={styles.deleteButton}
-                    onPress={() => confirmDelete(outfit.id)}
+                    onPress={() => confirmDelete(outfit.id, outfit.imageUrl)}
                 >
                     <MaterialIcons name="delete-outline" size={24} color="black" />
                 </TouchableOpacity>
@@ -120,14 +136,43 @@ export default function HomeScreen() {
         );
     };
 
+    const renderCategorySection = (section: CategorySection) => {
+        return (
+            <View key={section.categoryId} style={styles.categorySection}>
+                {/* Category Header */}
+                <View style={styles.categoryHeader}>
+                    <Text style={styles.categoryTitle}>{section.categoryName}</Text>
+                    <Text style={styles.categoryCount}>{section.outfits.length} outfit{section.outfits.length !== 1 ? 's' : ''}</Text>
+                </View>
+
+                {/* Swiper Container */}
+                <View style={styles.swiperWrapper}>
+                    <ScrollView
+                        horizontal
+                        pagingEnabled
+                        showsHorizontalScrollIndicator={false}
+                        decelerationRate="fast"
+                        snapToInterval={CARD_WIDTH + 20}
+                        snapToAlignment="center"
+                        contentContainerStyle={styles.horizontalScrollContent}
+                    >
+                        {section.outfits.map((outfit, index) => (
+                            <View key={outfit.id} style={styles.cardWrapper}>
+                                {renderCard(outfit, index, section.outfits.length)}
+                            </View>
+                        ))}
+                    </ScrollView>
+                </View>
+            </View>
+        );
+    };
+
     const renderEmptyState = () => (
         <View style={styles.emptyState}>
             <MaterialIcons name="checkroom" size={80} color={colors.textTertiary} />
             <Text style={styles.emptyText}>No saved outfits</Text>
             <Text style={styles.emptySubtext}>
-                {selectedCategory === 'all'
-                    ? 'Create your first outfit in the Fitting Room'
-                    : 'No outfits found in this category'}
+                Create your first outfit in the Fitting Room
             </Text>
         </View>
     );
@@ -137,83 +182,24 @@ export default function HomeScreen() {
             <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
             {/* Header */}
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>Mis Outfits</Text>
-            </View>
+            <PageHeader title="Mis Outfits" />
 
-            {/* Category Filter */}
-            <View style={styles.filterContainer}>
-                <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.filterContent}
-                >
-                    <TouchableOpacity
-                        style={[
-                            styles.filterChip,
-                            selectedCategory === 'all' && styles.activeFilterChip
-                        ]}
-                        onPress={() => setSelectedCategory('all')}
-                    >
-                        <Text style={[
-                            styles.filterText,
-                            selectedCategory === 'all' && styles.activeFilterText
-                        ]}>All Outfits</Text>
-                    </TouchableOpacity>
-
-                    {categories.map((category, index) => (
-                        <TouchableOpacity
-                            key={`category-${category.id}-${index}`}
-                            style={[
-                                styles.filterChip,
-                                selectedCategory === category.id && styles.activeFilterChip
-                            ]}
-                            onPress={() => setSelectedCategory(category.id)}
-                        >
-                            <Text style={[
-                                styles.filterText,
-                                selectedCategory === category.id && styles.activeFilterText
-                            ]}>{category.name}</Text>
-                        </TouchableOpacity>
-                    ))}
-                </ScrollView>
-            </View>
-
-            {/* Cards or Empty State */}
-            {filteredOutfits.length === 0 ? (
+            {/* Content */}
+            {savedOutfits.length === 0 ? (
                 renderEmptyState()
             ) : (
-                <View style={styles.swiperContainer}>
-                    <Swiper
-                        key={`swiper-${selectedCategory}-${filteredOutfits.length}-${filteredOutfits.map(o => o.id).join('-')}`}
-                        ref={swiperRef}
-                        cards={filteredOutfits}
-                        renderCard={renderCard}
-                        onSwiped={(cardIndex) => {
-                            // Only update state, don't do complex calculations
-                            setCurrentIndex(cardIndex);
-                        }}
-                        cardIndex={0}
-                        backgroundColor="transparent"
-                        stackSize={3}
-                        stackScale={5}
-                        stackSeparation={15}
-                        disableTopSwipe
-                        disableBottomSwipe
-                        disableLeftSwipe={filteredOutfits.length === 1}
-                        disableRightSwipe={filteredOutfits.length === 1}
-                        infinite={filteredOutfits.length > 1}
-                        showSecondCard={filteredOutfits.length > 1}
-                        verticalSwipe={false}
-                        animateCardOpacity
-                    />
-                </View>
+                <ScrollView
+                    style={styles.scrollView}
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                >
+                    {categorySections.map(section => renderCategorySection(section))}
+                </ScrollView>
             )}
 
             {/* Image Zoom Viewer */}
             {selectedImageUrl && (
                 <ImageViewing
-                    key={`image-viewer-${selectedImageUrl}`}
                     images={images}
                     imageIndex={0}
                     visible={imageModalVisible}
@@ -240,54 +226,45 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFFFF', // bg-white
-    },
-    header: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#EFEFEF',
         backgroundColor: '#FFFFFF',
     },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#1A1A1A',
+    scrollView: {
+        flex: 1,
     },
-    filterContainer: {
-        height: 50,
-        marginBottom: 4,
-        marginTop: 12,
+    scrollContent: {
+        paddingVertical: spacing.sm, // Reduced from spacing.md
     },
-    filterContent: {
+    categorySection: {
+        marginBottom: spacing.lg,
+    },
+    categoryHeader: {
         paddingHorizontal: spacing.lg,
-        gap: 8,
-        alignItems: 'center',
+        marginBottom: spacing.md,
     },
-    filterChip: {
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 9999, // rounded-full
-        backgroundColor: '#F3F4F6', // bg-gray-100
+    categoryTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: colors.textPrimary,
+        marginBottom: 4,
     },
-    activeFilterChip: {
-        backgroundColor: '#000000',
-    },
-    filterText: {
+    categoryCount: {
         fontSize: 14,
         fontWeight: '500',
-        color: '#4B5563', // text-gray-600
+        color: colors.textSecondary,
     },
-    activeFilterText: {
-        color: '#FFFFFF',
+    swiperWrapper: {
+        height: CARD_HEIGHT + 20,
     },
-    swiperContainer: {
-        flex: 1,
+    horizontalScrollContent: {
+        paddingHorizontal: (SCREEN_WIDTH - CARD_WIDTH) / 2,
+        gap: 12,
+    },
+    cardWrapper: {
+        width: CARD_WIDTH,
+    },
+    singleCardContainer: {
         alignItems: 'center',
         justifyContent: 'center',
-        marginTop: -40,
     },
     card: {
         width: CARD_WIDTH,
@@ -295,18 +272,22 @@ const styles = StyleSheet.create({
         borderRadius: borderRadius.lg,
         backgroundColor: '#FFFFFF',
         borderWidth: 2,
-        borderColor: '#F3F4F6', // border-gray-100
+        borderColor: '#F3F4F6',
         overflow: 'hidden',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.05,
-        shadowRadius: 15, // shadow-subtle
+        shadowRadius: 15,
         elevation: 5,
     },
     cardImage: {
         width: '100%',
         height: '100%',
         backgroundColor: '#F3F4F6',
+    },
+    imageContainer: {
+        width: '100%',
+        height: '100%',
     },
     deleteButton: {
         position: 'absolute',
@@ -315,7 +296,7 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: 'rgba(255, 255, 255, 0.6)', // bg-white/60
+        backgroundColor: 'rgba(255, 255, 255, 0.6)',
         justifyContent: 'center',
         alignItems: 'center',
         zIndex: 10,
@@ -337,6 +318,21 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#FFFFFF',
     },
+    counterBadge: {
+        position: 'absolute',
+        top: spacing.md,
+        left: spacing.md,
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        zIndex: 10,
+    },
+    counterText: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: '600',
+    },
     emptyState: {
         flex: 1,
         justifyContent: 'center',
@@ -355,24 +351,5 @@ const styles = StyleSheet.create({
         color: colors.textTertiary,
         textAlign: 'center',
         marginTop: spacing.sm,
-    },
-    counterBadge: {
-        position: 'absolute',
-        top: spacing.md,
-        left: spacing.md,
-        backgroundColor: 'rgba(0, 0, 0, 0.6)',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 20,
-        zIndex: 10,
-    },
-    counterText: {
-        color: '#FFFFFF',
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    imageContainer: {
-        width: '100%',
-        height: '100%',
     },
 });

@@ -9,6 +9,7 @@ import { useUserPhoto } from '../../context/UserPhotoContext';
 import { useAuth } from '../../context/AuthContext';
 import { mockUser } from '../../constants/mockData';
 import CustomAlert from '../../components/CustomAlert';
+import PageHeader from '../../components/PageHeader';
 
 export default function ProfileScreen() {
     const navigation = useNavigation();
@@ -53,13 +54,13 @@ export default function ProfileScreen() {
         return true;
     };
 
-    const handleTakePhoto = async () => {
+    const handleTakePhotoPress = async () => {
         const hasPermission = await requestPermissions('camera');
         if (!hasPermission) return;
 
         try {
             const result = await ImagePicker.launchCameraAsync({
-                mediaTypes: ['images'],
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
                 allowsEditing: false,
                 quality: 0.8,
             });
@@ -79,7 +80,7 @@ export default function ProfileScreen() {
 
         try {
             const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ['images'],
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
                 allowsEditing: false,
                 quality: 0.8,
             });
@@ -93,8 +94,6 @@ export default function ProfileScreen() {
         }
     };
 
-    // Note: Profile photo deletion now handled through re-uploading a different photo
-
     const displayImage = userPhotoUri || mockUser.image;
     const isCustomPhoto = !!userPhotoUri;
 
@@ -103,9 +102,7 @@ export default function ProfileScreen() {
             <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
             {/* Header */}
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>Perfil</Text>
-            </View>
+            <PageHeader title="Perfil" showBackButton />
 
             <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
                 {/* Photo Card */}
@@ -134,7 +131,18 @@ export default function ProfileScreen() {
                 <View style={styles.actionsContainer}>
                     <TouchableOpacity
                         style={styles.actionButton}
-                        onPress={handleTakePhoto}
+                        onPress={() => navigation.navigate('ManageCategories' as never)}
+                    >
+                        <View style={styles.iconContainer}>
+                            <MaterialIcons name="category" size={24} color="#000000" />
+                        </View>
+                        <Text style={styles.actionButtonText}>Gestionar Categorías</Text>
+                        <MaterialIcons name="chevron-right" size={24} color="rgba(0,0,0,0.5)" />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.actionButton}
+                        onPress={handleTakePhotoPress}
                         disabled={isUploading}
                     >
                         <View style={styles.iconContainer}>
@@ -212,20 +220,6 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#FFFFFF',
     },
-    header: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#EFEFEF',
-        backgroundColor: '#FFFFFF',
-    },
-    headerTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: '#1A1A1A',
-    },
     scrollView: {
         flex: 1,
     },
@@ -234,12 +228,13 @@ const styles = StyleSheet.create({
     },
     photoCardContainer: {
         paddingHorizontal: spacing.lg,
+        marginVertical: spacing.lg,
         marginBottom: spacing.lg,
     },
     photoCard: {
         width: '100%',
         aspectRatio: 3 / 4,
-        borderRadius: 16, // rounded-xl
+        borderRadius: 16,
         backgroundColor: '#F0F0F0',
         borderWidth: 1,
         borderColor: 'rgba(0,0,0,0.1)',
@@ -269,20 +264,15 @@ const styles = StyleSheet.create({
     },
     actionsContainer: {
         paddingHorizontal: spacing.lg,
-        gap: 12, // gap-3
+        gap: 12,
     },
     actionButton: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 16,
-        height: 56, // min-h-14
+        height: 56,
         backgroundColor: '#F0F0F0',
         borderRadius: 8,
-    },
-    deleteButton: {
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1,
-        borderColor: 'rgba(0,0,0,0.1)',
     },
     iconContainer: {
         width: 40,

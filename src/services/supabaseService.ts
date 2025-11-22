@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import * as FileSystem from 'expo-file-system/legacy';
 import { decode } from 'base64-arraybuffer';
+import { removeBackground } from './gemini';
 
 export interface Profile {
     id: string;
@@ -12,7 +13,7 @@ export interface Profile {
 export interface Garment {
     id: string;
     user_id: string;
-    category: 'upper' | 'lower' | 'footwear';
+    category: 'upper' | 'lower' | 'footwear' | 'one-piece';
     type: string;
     description: string;
     image_url: string;
@@ -114,7 +115,7 @@ export const updateProfilePhoto = async (
 
 export const getGarments = async (
     userId: string,
-    category?: 'upper' | 'lower' | 'footwear'
+    category?: 'upper' | 'lower' | 'footwear' | 'one-piece'
 ): Promise<{ data: Garment[] | null; error: any }> => {
     let query = supabase
         .from('garments')
@@ -132,7 +133,7 @@ export const getGarments = async (
 
 export const createGarment = async (
     userId: string,
-    category: 'upper' | 'lower' | 'footwear',
+    category: 'upper' | 'lower' | 'footwear' | 'one-piece',
     type: string,
     description: string,
     imageUri: string
@@ -141,19 +142,34 @@ export const createGarment = async (
         console.log('🔵 [createGarment] Iniciando subida de prenda...');
         console.log('📝 [createGarment] Parámetros:', { userId, category, type, description, imageUri: imageUri.substring(0, 50) + '...' });
 
-        // Upload image
-        const fileExt = imageUri.split('.').pop() || 'jpg';
+        // STEP 1: Remove background using Gemini AI
+        console.log('🎨 [createGarment] Removiendo fondo con Gemini AI...');
+        const bgRemovalResult = await removeBackground(imageUri);
+
+        let base64: string;
+
+        if (bgRemovalResult.success && bgRemovalResult.imageBase64) {
+            console.log('✅ [createGarment] Fondo removido exitosamente');
+            console.log('📊 [createGarment] Usando imagen con fondo blanco');
+            base64 = bgRemovalResult.imageBase64;
+        } else {
+            console.warn('⚠️ [createGarment] No se pudo remover el fondo, usando imagen original');
+            console.warn('Error:', bgRemovalResult.error);
+
+            // Fallback: use original image
+            console.log('🖼️ [createGarment] Leyendo imagen original como base64...');
+            base64 = await FileSystem.readAsStringAsync(imageUri, {
+                encoding: 'base64',
+            });
+        }
+
+        // STEP 2: Upload to Supabase
+        const fileExt = 'jpg'; // Always save as JPG
         const fileName = `${Date.now()}.${fileExt}`;
         const filePath = `${userId}/${category}/${fileName}`;
 
         console.log('📁 [createGarment] Ruta de archivo:', filePath);
-        console.log('🖼️ [createGarment] Leyendo imagen como base64...');
-
-        const base64 = await FileSystem.readAsStringAsync(imageUri, {
-            encoding: 'base64',
-        });
-
-        console.log('✅ [createGarment] Imagen leída, tamaño base64:', base64.length, 'caracteres');
+        console.log('✅ [createGarment] Imagen preparada, tamaño base64:', base64.length, 'caracteres');
         console.log('☁️ [createGarment] Subiendo a Supabase Storage bucket: garment-images...');
 
         const { error: uploadError } = await supabase.storage

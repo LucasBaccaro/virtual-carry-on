@@ -9,7 +9,7 @@ import HomeScreen from '../screens/main/HomeScreen';
 import WardrobeScreen from '../screens/main/WardrobeScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import ManageCategoriesScreen from '../screens/main/ManageCategoriesScreen';
-import WardrobeManagementScreen from '../screens/main/WardrobeManagementScreen';
+import ClosetScreen from '../screens/main/ClosetScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -48,16 +48,6 @@ function TabNavigator() {
                 }}
             />
             <Tab.Screen
-                name="Closet"
-                component={WardrobeManagementScreen}
-                options={{
-                    tabBarLabel: 'Closet',
-                    tabBarIcon: ({ color, size, focused }) => (
-                        <MaterialIcons name={focused ? "checkroom" : "checkroom"} size={size} color={color} />
-                    ),
-                }}
-            />
-            <Tab.Screen
                 name="Wardrobe"
                 component={WardrobeScreen}
                 options={{
@@ -68,22 +58,12 @@ function TabNavigator() {
                 }}
             />
             <Tab.Screen
-                name="Categories"
-                component={ManageCategoriesScreen}
+                name="Closet"
+                component={ClosetScreen}
                 options={{
-                    tabBarLabel: 'Categories',
+                    tabBarLabel: 'Closet',
                     tabBarIcon: ({ color, size, focused }) => (
-                        <MaterialIcons name={focused ? "category" : "category"} size={size} color={color} />
-                    ),
-                }}
-            />
-            <Tab.Screen
-                name="Profile"
-                component={ProfileScreen}
-                options={{
-                    tabBarLabel: 'Profile',
-                    tabBarIcon: ({ color, size, focused }) => (
-                        <MaterialIcons name={focused ? "person" : "person-outline"} size={size} color={color} />
+                        <MaterialIcons name={focused ? "checkroom" : "checkroom"} size={size} color={color} />
                     ),
                 }}
             />
@@ -95,6 +75,8 @@ export default function MainNavigator() {
     return (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="MainTabs" component={TabNavigator} />
+            <Stack.Screen name="Profile" component={ProfileScreen} />
+            <Stack.Screen name="ManageCategories" component={ManageCategoriesScreen} />
         </Stack.Navigator>
     );
 }

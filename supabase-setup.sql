@@ -78,7 +78,7 @@ CREATE POLICY "Users can delete own categories"
 CREATE TABLE garments (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-    category TEXT NOT NULL CHECK (category IN ('upper', 'lower', 'footwear')),
+    category TEXT NOT NULL CHECK (category IN ('upper', 'lower', 'footwear', 'one-piece')),
     type TEXT NOT NULL,
     description TEXT,
     image_url TEXT NOT NULL,

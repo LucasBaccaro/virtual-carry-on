@@ -10,6 +10,7 @@ import {
     StatusBar,
     ActivityIndicator,
     Image,
+    ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -68,10 +69,7 @@ export default function LoginScreen() {
         <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
             <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
 
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={styles.keyboardView}
-            >
+            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <View style={styles.content}>
                     {/* Logo Circular en el Centro */}
                     <View style={styles.logoContainer}>
@@ -142,7 +140,7 @@ export default function LoginScreen() {
                         </TouchableOpacity>
                     </View>
                 </View>
-            </KeyboardAvoidingView>
+            </ScrollView>
 
             {/* Custom Alert */}
             <CustomAlert
@@ -163,6 +161,9 @@ const styles = StyleSheet.create({
     },
     keyboardView: {
         flex: 1,
+    },
+    scrollContent: {
+        flexGrow: 1,
     },
     content: {
         flex: 1,
