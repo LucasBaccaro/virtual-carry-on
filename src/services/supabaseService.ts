@@ -17,6 +17,26 @@ export interface Garment {
     type: string;
     description: string;
     image_url: string;
+    metadata?: {
+        colors: string[];
+        primaryColor: string;
+        style: string;
+        occasion: string[];
+        season: string[];
+        pattern: string;
+        material: string;
+        formality: 'casual' | 'formal' | 'sport';
+        versatility: number;
+    };
+    ai_analysis?: {
+        detailedDescription: string;
+        suggestedPairings: string[];
+        formality: 'casual' | 'formal' | 'sport';
+        versatility: number;
+        analyzedAt: string;
+    };
+    usage_count?: number;
+    last_used_at?: string;
     created_at: string;
 }
 
@@ -194,9 +214,25 @@ export const createGarment = async (
             .getPublicUrl(filePath);
 
         console.log('🔗 [createGarment] URL pública generada:', publicUrl);
+
+        // STEP 3: Analyze garment with AI to extract metadata
+        console.log('🤖 [createGarment] Analizando prenda con IA...');
+        let metadata = {};
+        let aiAnalysis = {};
+
+        try {
+            const { analyzeGarmentWithAI } = await import('./garmentAnalysis');
+            const analysis = await analyzeGarmentWithAI(base64, category, type, description);
+            metadata = analysis.metadata;
+            aiAnalysis = analysis.aiAnalysis;
+            console.log('✅ [createGarment] Análisis IA completado');
+        } catch (analysisError) {
+            console.warn('⚠️ [createGarment] Error en análisis IA, continuando sin metadata:', analysisError);
+        }
+
         console.log('💾 [createGarment] Insertando registro en base de datos...');
 
-        // Create garment record
+        // Create garment record with metadata
         const { data, error } = await supabase
             .from('garments')
             .insert({
@@ -205,6 +241,9 @@ export const createGarment = async (
                 type,
                 description,
                 image_url: publicUrl,
+                metadata,
+                ai_analysis: aiAnalysis,
+                usage_count: 0,
             })
             .select()
             .single();

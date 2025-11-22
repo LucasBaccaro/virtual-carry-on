@@ -13,11 +13,14 @@ import ModelSelector from '../../components/ModelSelector';
 import PageHeader from '../../components/PageHeader';
 import { generateTryOnImage } from '../../services/gemini';
 
-export default function WardrobeScreen() {
+export default function WardrobeScreen({ route }: any) {
     const navigation = useNavigation();
     const { user } = useAuth();
     const { saveOutfit, categories } = useOutfits();
     const { userPhotoUri, reloadUserPhoto } = useUserPhoto();
+
+    // Get pre-selected garments from route params (from recommendations)
+    const { preselectedGarments, autoGenerate } = route?.params || {};
 
     // Garments from Supabase
     const [upperGarments, setUpperGarments] = useState<Garment[]>([]);
@@ -55,6 +58,41 @@ export default function WardrobeScreen() {
             reloadUserPhoto();
         }, [user])
     );
+
+    // Handle pre-selected garments from recommendations
+    // Auto-generation trigger state
+    const [shouldAutoGenerate, setShouldAutoGenerate] = useState(false);
+
+    // Handle pre-selected garments from recommendations
+    useEffect(() => {
+        if (preselectedGarments && !isLoadingGarments) {
+            console.log('🎯 [WardrobeScreen] Pre-selecting garments from recommendation');
+            setSelectedUpper(preselectedGarments.upperId || null);
+            setSelectedLower(preselectedGarments.lowerId || null);
+            setSelectedFootwear(preselectedGarments.footwearId || null);
+
+            // Trigger auto-generate if requested
+            if (autoGenerate) {
+                console.log('⚡ [WardrobeScreen] Auto-generating try-on requested');
+                setShouldAutoGenerate(true);
+            }
+
+            // Clear route params after using them to prevent re-triggering
+            navigation.setParams({ preselectedGarments: undefined, autoGenerate: undefined });
+        }
+    }, [preselectedGarments, isLoadingGarments]);
+
+    // Execute auto-generation once state is updated
+    useEffect(() => {
+        if (shouldAutoGenerate) {
+            const hasSelection = selectedUpper || selectedLower || selectedFootwear || selectedOnePiece;
+            if (hasSelection) {
+                console.log('⚡ [WardrobeScreen] Executing auto-generation');
+                handleTryOn();
+                setShouldAutoGenerate(false);
+            }
+        }
+    }, [shouldAutoGenerate, selectedUpper, selectedLower, selectedFootwear, selectedOnePiece]);
 
     const loadGarments = async () => {
         if (!user) return;
@@ -264,6 +302,7 @@ export default function WardrobeScreen() {
         return (
             <SafeAreaView style={styles.container} edges={['top']}>
                 <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+                <PageHeader title="Crear Outfit" />
                 <View style={styles.emptyStateContainer}>
                     <MaterialIcons name="checkroom" size={80} color="#CCC" />
                     <Text style={styles.emptyStateTitle}>Tu guardarropa está vacío</Text>
@@ -333,15 +372,31 @@ export default function WardrobeScreen() {
                                 <Text style={styles.loadingText}>Generando tu look...</Text>
                             </View>
                         ) : (
-                            <Image
-                                source={
-                                    generatedImageBase64 && !isComparing
-                                        ? { uri: `data:image/jpeg;base64,${generatedImageBase64}` }
-                                        : { uri: userPhotoUri }
-                                }
-                                style={styles.previewImage}
-                                resizeMode="cover"
-                            />
+                            <>
+                                {/* Original Image (Always rendered if available) */}
+                                {userPhotoUri && (
+                                    <Image
+                                        source={{ uri: userPhotoUri }}
+                                        style={[styles.previewImage, { position: 'absolute' }]}
+                                        resizeMode="cover"
+                                    />
+                                )}
+
+                                {/* Generated Image (Overlay) */}
+                                {generatedImageBase64 && !isGenerating && (
+                                    <Image
+                                        source={{ uri: `data:image/jpeg;base64,${generatedImageBase64}` }}
+                                        style={[
+                                            styles.previewImage,
+                                            {
+                                                position: 'absolute',
+                                                opacity: isComparing ? 0 : 1 // Hide when comparing (show original behind)
+                                            }
+                                        ]}
+                                        resizeMode="cover"
+                                    />
+                                )}
+                            </>
                         )}
 
                         {!isGenerating && generatedImageBase64 && (
@@ -467,7 +522,7 @@ export default function WardrobeScreen() {
                 message={alertConfig.message}
                 onClose={() => setAlertVisible(false)}
             />
-        </SafeAreaView>
+        </SafeAreaView >
     );
 }
 
@@ -512,7 +567,7 @@ const styles = StyleSheet.create({
         gap: 8,
         backgroundColor: '#000',
         paddingHorizontal: 24,
-        paddingVertical: 16,
+        paddingVertical: 12,
         borderRadius: 8,
     },
     emptyStateButtonText: {
@@ -577,9 +632,18 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        backgroundColor: 'rgba(0, 0, 0, 0.6)', // Darker background
         justifyContent: 'center',
         alignItems: 'center',
+        // Add shadow for better visibility
+        shadowColor: "#000",
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        elevation: 5,
     },
     section: {
         marginBottom: 24,

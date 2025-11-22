@@ -29,24 +29,21 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const onboardingData = [
     {
         id: 1,
-        // User will provide this image
         image: require('../../../assets/images/onboarding-1.png'),
-        title: 'Bienvenido a SmartFit',
-        description: 'Descubre cómo se verán tus outfits antes de usarlos',
+        title: 'Tu Guardarropa Virtual',
+        description: 'Digitaliza todas tus prendas y accede a tu closet desde cualquier lugar',
     },
     {
         id: 2,
-        // User will provide this image
         image: require('../../../assets/images/onboarding-2.png'),
-        title: 'Prueba Virtual',
-        description: 'Prueba diferentes combinaciones con tu foto',
+        title: 'Prueba con IA',
+        description: 'Visualiza cómo te quedan diferentes outfits antes de vestirte',
     },
     {
         id: 3,
-        // User will provide this image
         image: require('../../../assets/images/onboarding-3.png'),
-        title: 'Guarda tus Favoritos',
-        description: 'Organiza y guarda tus outfits favoritos',
+        title: 'Organiza y Guarda',
+        description: 'Crea categorías personalizadas y guarda tus combinaciones favoritas',
     },
 ];
 
@@ -78,14 +75,14 @@ export default function OnboardingScreen() {
 
     const handleGetStarted = async () => {
         await setFirstLaunchComplete();
-        navigation.replace('Login');
+        navigation.replace('Signup');
     };
 
     const isLastSlide = currentIndex === onboardingData.length - 1;
 
     return (
         <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-            <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+            <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
             {/* Skip Button */}
             {!isLastSlide && (
@@ -103,9 +100,11 @@ export default function OnboardingScreen() {
                 onScroll={handleScroll}
                 scrollEventThrottle={16}
                 style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
             >
                 {onboardingData.map((item) => (
                     <View key={item.id} style={styles.slide}>
+                        {/* Image Container */}
                         <View style={styles.imageContainer}>
                             <Image
                                 source={item.image}
@@ -113,6 +112,8 @@ export default function OnboardingScreen() {
                                 resizeMode="contain"
                             />
                         </View>
+
+                        {/* Text Content */}
                         <View style={styles.textContainer}>
                             <Text style={styles.title}>{item.title}</Text>
                             <Text style={styles.description}>{item.description}</Text>
@@ -121,7 +122,7 @@ export default function OnboardingScreen() {
                 ))}
             </ScrollView>
 
-            {/* Bottom Section */}
+            {/* Bottom Section - Fixed Height */}
             <View style={styles.bottomSection}>
                 {/* Pagination Dots */}
                 <View style={styles.paginationContainer}>
@@ -136,19 +137,32 @@ export default function OnboardingScreen() {
                     ))}
                 </View>
 
-                {/* Action Button */}
-                {isLastSlide ? (
-                    <TouchableOpacity
-                        style={styles.actionButton}
-                        onPress={handleGetStarted}
-                    >
-                        <Text style={styles.actionButtonText}>Comenzar</Text>
-                    </TouchableOpacity>
-                ) : (
-                    <TouchableOpacity style={styles.actionButton} onPress={handleNext}>
-                        <Text style={styles.actionButtonText}>Siguiente</Text>
-                    </TouchableOpacity>
-                )}
+                {/* Action Buttons - Fixed Container */}
+                <View style={styles.buttonWrapper}>
+                    {isLastSlide ? (
+                        <View style={styles.buttonContainer}>
+                            <TouchableOpacity
+                                style={styles.primaryButton}
+                                onPress={handleGetStarted}
+                            >
+                                <Text style={styles.primaryButtonText}>Comenzar</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.secondaryButton}
+                                onPress={handleSkip}
+                            >
+                                <Text style={styles.secondaryButtonText}>Ya tengo cuenta</Text>
+                            </TouchableOpacity>
+                        </View>
+                    ) : (
+                        <View style={styles.singleButtonContainer}>
+                            <TouchableOpacity style={styles.primaryButton} onPress={handleNext}>
+                                <Text style={styles.primaryButtonText}>Siguiente</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+                </View>
             </View>
         </SafeAreaView>
     );
@@ -157,12 +171,12 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#ffffff',
+        backgroundColor: '#FFFFFF',
     },
     skipButton: {
         position: 'absolute',
-        top: 60,
-        right: 16,
+        top: 40,
+        right: 20,
         zIndex: 10,
         paddingHorizontal: 16,
         paddingVertical: 8,
@@ -170,10 +184,13 @@ const styles = StyleSheet.create({
     skipText: {
         fontSize: 16,
         fontWeight: '400',
-        color: '#111111',
+        color: '#000000',
     },
     scrollView: {
         flex: 1,
+    },
+    scrollContent: {
+        flexGrow: 1,
     },
     slide: {
         width: SCREEN_WIDTH,
@@ -183,24 +200,25 @@ const styles = StyleSheet.create({
         paddingHorizontal: 32,
     },
     imageContainer: {
-        flex: 1,
+        width: SCREEN_WIDTH * 0.85,
+        height: SCREEN_WIDTH * 0.85,
         justifyContent: 'center',
         alignItems: 'center',
-        width: '100%',
-        marginBottom: 32,
+        marginBottom: 48,
     },
     image: {
-        width: SCREEN_WIDTH * 0.8,
-        height: SCREEN_WIDTH * 0.8,
+        width: '100%',
+        height: '100%',
+        borderRadius: 16,
     },
     textContainer: {
         alignItems: 'center',
-        paddingBottom: 40,
+        paddingHorizontal: 20,
     },
     title: {
         fontSize: 28,
         fontWeight: '700',
-        color: '#111111',
+        color: '#000000',
         textAlign: 'center',
         marginBottom: 12,
         letterSpacing: -0.5,
@@ -208,10 +226,9 @@ const styles = StyleSheet.create({
     description: {
         fontSize: 16,
         fontWeight: '400',
-        color: '#616189',
+        color: '#666666',
         textAlign: 'center',
         lineHeight: 24,
-        paddingHorizontal: 16,
     },
     bottomSection: {
         paddingHorizontal: 32,
@@ -232,21 +249,46 @@ const styles = StyleSheet.create({
         backgroundColor: '#E0E0E0',
     },
     activeDot: {
-        width: 24,
-        backgroundColor: '#111111',
+        width: 32,
+        backgroundColor: '#000000',
     },
-    actionButton: {
+    buttonWrapper: {
+        minHeight: 124, // 56 + 12 + 56 (altura de dos botones con gap)
+        justifyContent: 'flex-end',
+    },
+    buttonContainer: {
+        gap: 12,
+    },
+    singleButtonContainer: {
+        // Vacío para que el botón se posicione al final del wrapper
+    },
+    primaryButton: {
         width: '100%',
         height: 56,
-        backgroundColor: '#111111',
+        backgroundColor: '#000000',
         borderRadius: 8,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    actionButtonText: {
+    primaryButtonText: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#ffffff',
+        color: '#FFFFFF',
         letterSpacing: 0.24,
+    },
+    secondaryButton: {
+        width: '100%',
+        height: 56,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#E5E5E5',
+    },
+    secondaryButtonText: {
+        fontSize: 16,
+        fontWeight: '400',
+        color: '#000000',
     },
 });

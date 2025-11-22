@@ -7,9 +7,12 @@ import { MaterialIcons } from '@expo/vector-icons';
 // Screens
 import HomeScreen from '../screens/main/HomeScreen';
 import WardrobeScreen from '../screens/main/WardrobeScreen';
+import WardrobeManagementScreen from '../screens/main/WardrobeManagementScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import ManageCategoriesScreen from '../screens/main/ManageCategoriesScreen';
 import ClosetScreen from '../screens/main/ClosetScreen';
+import RecommendationsScreen from '../screens/main/RecommendationsScreen';
+import FashionAgentScreen from '../screens/main/FashionAgentScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -48,6 +51,16 @@ function TabNavigator() {
                 }}
             />
             <Tab.Screen
+                name="Looks"
+                component={RecommendationsScreen}
+                options={{
+                    tabBarLabel: 'Looks',
+                    tabBarIcon: ({ color, size, focused }) => (
+                        <MaterialIcons name={focused ? "lightbulb" : "lightbulb-outline"} size={size} color={color} />
+                    ),
+                }}
+            />
+            <Tab.Screen
                 name="Wardrobe"
                 component={WardrobeScreen}
                 options={{
@@ -77,6 +90,13 @@ export default function MainNavigator() {
             <Stack.Screen name="MainTabs" component={TabNavigator} />
             <Stack.Screen name="Profile" component={ProfileScreen} />
             <Stack.Screen name="ManageCategories" component={ManageCategoriesScreen} />
+            <Stack.Screen
+                name="FashionAgent"
+                component={FashionAgentScreen}
+                options={{
+                    headerShown: false,
+                }}
+            />
         </Stack.Navigator>
     );
 }
