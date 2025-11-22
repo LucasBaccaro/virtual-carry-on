@@ -114,7 +114,7 @@ export const mockGarments: Garment[] = [
         type: 'footwear',
         description: 'Zapatillas deportivas blancas',
         fit: 'regular',
-        image: require('../../assets/images/sneakers_white.png'),
+        image: require('../../assets/images/sneakers_white.jpg'),
     },
     {
         id: '14',
@@ -122,7 +122,7 @@ export const mockGarments: Garment[] = [
         type: 'footwear',
         description: 'Zapatos de vestir negros de cuero',
         fit: 'regular',
-        image: require('../../assets/images/shoes_black.png'),
+        image: require('../../assets/images/shoes_black.jpg'),
     },
     {
         id: '15',
@@ -130,7 +130,7 @@ export const mockGarments: Garment[] = [
         type: 'footwear',
         description: 'Botas de cuero marrón',
         fit: 'regular',
-        image: require('../../assets/images/boots_brown.png'),
+        image: require('../../assets/images/boots_brown.jpg'),
     },
     {
         id: '16',
