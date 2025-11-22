@@ -161,9 +161,12 @@ export default function WardrobeScreen({ route }: any) {
         setLoadingStep('analyzing');
 
         try {
-            // Simulate steps for better UX
-            setTimeout(() => setLoadingStep('lighting'), 2000);
-            setTimeout(() => setLoadingStep('generating'), 4500);
+            // Simulate steps for better UX (extended for ~30-40s generation time)
+            setTimeout(() => setLoadingStep('preparing'), 3000);
+            setTimeout(() => setLoadingStep('lighting'), 8000);
+            setTimeout(() => setLoadingStep('textures'), 15000);
+            setTimeout(() => setLoadingStep('refining'), 25000);
+            setTimeout(() => setLoadingStep('finalizing'), 35000);
 
             const upperItem = upperGarments.find(i => i.id === selectedUpper);
             const lowerItem = lowerGarments.find(i => i.id === selectedLower);
@@ -379,8 +382,11 @@ export default function WardrobeScreen({ route }: any) {
                                 <ActivityIndicator size="large" color="#000000" />
                                 <Text style={styles.loadingText}>
                                     {loadingStep === 'analyzing' && 'Analizando prendas...'}
-                                    {loadingStep === 'lighting' && 'Ajustando iluminación...'}
-                                    {loadingStep === 'generating' && 'Generando imagen...'}
+                                    {loadingStep === 'preparing' && 'Preparando modelo virtual...'}
+                                    {loadingStep === 'lighting' && 'Ajustando iluminación y sombras...'}
+                                    {loadingStep === 'textures' && 'Aplicando texturas realistas...'}
+                                    {loadingStep === 'refining' && 'Refinando detalles finales...'}
+                                    {loadingStep === 'finalizing' && 'Generando imagen de alta calidad...'}
                                     {!loadingStep && 'Procesando...'}
                                 </Text>
                             </View>
